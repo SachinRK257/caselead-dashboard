@@ -1,10 +1,14 @@
 import { useMemo, useState } from "react";
-import { ArrowUpRight, IndianRupee } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
 import EmptyState from "./EmptyState";
 import StatusBadge from "./StatusBadge";
-import { isHighLiability, parseAmount } from "../utils/cases";
-import { formatAmount } from "../utils/format";
+import {
+  HIGH_LIABILITY_THRESHOLD,
+  isHighLiability,
+  parseAmount,
+} from "../utils/cases";
+import { formatMoneyFull, formatMoneyShort } from "../utils/format";
 
 const COLUMN_COUNT = 7;
 
@@ -39,15 +43,18 @@ export default function HighLiabilityCases({ cases = [] }) {
     <div className="panel full-panel">
       <div className="panel-header">
         <div>
-          <h2>High Liability Cases</h2>
-          <p>Cases requiring priority attention</p>
+          <h2>Biggest Cases</h2>
+          <p>
+            {formatMoneyShort(HIGH_LIABILITY_THRESHOLD)} and above &mdash;
+            work on these first
+          </p>
         </div>
 
         <form className="liability-filter" onSubmit={handleSubmit}>
           <input
             type="text"
             inputMode="numeric"
-            placeholder="Min amount"
+            placeholder="Min ₹"
             aria-label="Minimum liability amount"
             value={minInput}
             onChange={(event) => setMinInput(event.target.value)}
@@ -55,7 +62,7 @@ export default function HighLiabilityCases({ cases = [] }) {
           <input
             type="text"
             inputMode="numeric"
-            placeholder="Max amount"
+            placeholder="Max ₹"
             aria-label="Maximum liability amount"
             value={maxInput}
             onChange={(event) => setMaxInput(event.target.value)}
@@ -74,9 +81,9 @@ export default function HighLiabilityCases({ cases = [] }) {
               <th scope="col">Borrower</th>
               <th scope="col">Case ID</th>
               <th scope="col">Bank</th>
-              <th scope="col">Liability Amount</th>
+              <th scope="col">Amount Due</th>
               <th scope="col">Property</th>
-              <th scope="col">Timeline</th>
+              <th scope="col">Deadline</th>
               <th scope="col">
                 <span className="sr-only">Actions</span>
               </th>
@@ -108,9 +115,11 @@ export default function HighLiabilityCases({ cases = [] }) {
                   <td>{item.bank}</td>
 
                   <td>
-                    <div className="liability-amount">
-                      <IndianRupee size={14} aria-hidden="true" />
-                      {formatAmount(item.liability)}
+                    <div
+                      className="liability-amount"
+                      title={formatMoneyFull(item.liability)}
+                    >
+                      {formatMoneyShort(item.liability)}
                     </div>
                   </td>
 

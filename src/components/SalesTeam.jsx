@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { MapPin, Phone } from "lucide-react";
 
 import EmptyState from "./EmptyState";
+import { TIMELINE_COLORS } from "./charts/chartTokens";
 import { buildTeamWorkload, initialsOf } from "../utils/cases";
-import { formatAmount } from "../utils/format";
+import { formatMoneyFull, formatMoneyShort } from "../utils/format";
 
 const COLUMN_COUNT = 7;
 
@@ -34,8 +35,8 @@ export default function SalesTeam({ cases = [], currentUserId }) {
     <div className="panel full-panel">
       <div className="panel-header">
         <div>
-          <h2>Sales Team by City</h2>
-          <p>Case load per salesperson across branches</p>
+          <h2>Team Workload</h2>
+          <p>How many cases each person is carrying</p>
         </div>
 
         <select
@@ -60,10 +61,10 @@ export default function SalesTeam({ cases = [], currentUserId }) {
               <th scope="col">Salesperson</th>
               <th scope="col">City</th>
               <th scope="col">Contact</th>
-              <th scope="col">Case Load</th>
-              <th scope="col">Timeline Risk</th>
-              <th scope="col">Pending</th>
-              <th scope="col">Liability Handled</th>
+              <th scope="col">Cases</th>
+              <th scope="col">Deadline Status</th>
+              <th scope="col">Still To Do</th>
+              <th scope="col">Total Amount</th>
             </tr>
           </thead>
 
@@ -78,6 +79,8 @@ export default function SalesTeam({ cases = [], currentUserId }) {
                 const share = maxAssigned
                   ? Math.round((person.assigned / maxAssigned) * 100)
                   : 0;
+                const onTrack =
+                  person.assigned - person.dueSoon - person.overdue;
 
                 return (
                   <tr key={person.id}>
@@ -116,9 +119,26 @@ export default function SalesTeam({ cases = [], currentUserId }) {
                       <div className="workload-cell">
                         <div className="progress-track">
                           <div
-                            className="progress-fill"
+                            className="workload-stack"
                             style={{ width: `${share}%` }}
-                          />
+                            title={`${person.assigned} cases: ${onTrack} on track, ${person.dueSoon} due soon, ${person.overdue} overdue`}
+                          >
+                            {[
+                              { k: "ON_TRACK", v: onTrack },
+                              { k: "DUE_SOON", v: person.dueSoon },
+                              { k: "OVERDUE", v: person.overdue },
+                            ]
+                              .filter((part) => part.v > 0)
+                              .map((part) => (
+                                <span
+                                  key={part.k}
+                                  style={{
+                                    flexGrow: part.v,
+                                    background: TIMELINE_COLORS[part.k],
+                                  }}
+                                />
+                              ))}
+                          </div>
                         </div>
                         <strong>{person.assigned}</strong>
                       </div>
@@ -153,8 +173,11 @@ export default function SalesTeam({ cases = [], currentUserId }) {
                     </td>
 
                     <td>
-                      <div className="liability-amount">
-                        ₹{formatAmount(person.liability)}
+                      <div
+                        className="liability-amount"
+                        title={formatMoneyFull(person.liability)}
+                      >
+                        {formatMoneyShort(person.liability)}
                       </div>
                     </td>
                   </tr>

@@ -13,13 +13,15 @@ import {
 
 import { initialsOf } from "../utils/cases";
 
+/* Ids double as route names; `counts` supplies the badge so it can never
+   drift from the case list the way a hardcoded number does. */
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "cases", label: "All Cases", icon: Scale },
-  { id: "timeline", label: "Timeline", icon: CalendarClock, badge: 5 },
-  { id: "bank-visits", label: "Bank Visits", icon: Building2, badge: 8 },
-  { id: "documents", label: "Documents", icon: FileWarning, badge: 6 },
-  { id: "allocation", label: "Allocation", icon: Users },
+  { id: "deadlines", label: "Deadlines", icon: CalendarClock },
+  { id: "bank-visits", label: "Bank Visits", icon: Building2 },
+  { id: "documents", label: "Documents", icon: FileWarning },
+  { id: "assign", label: "Assign Cases", icon: Users },
 ];
 
 const SETTINGS_ITEMS = [{ id: "settings", label: "Settings", icon: Settings }];
@@ -29,7 +31,9 @@ export default function Sidebar({
   mobileOpen = false,
   onClose,
   activeItem = "dashboard",
+  counts = {},
   onNavigate,
+  onSignOut,
 }) {
   // Escape is the expected way out of an overlay drawer.
   useEffect(() => {
@@ -43,8 +47,9 @@ export default function Sidebar({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [mobileOpen, onClose]);
 
-  function renderNavItem({ id, label, icon: Icon, badge }) {
+  function renderNavItem({ id, label, icon: Icon }) {
     const isActive = id === activeItem;
+    const badge = counts[id];
 
     return (
       <button
@@ -120,9 +125,16 @@ export default function Sidebar({
             </div>
           </div>
 
-          <button type="button" className="logout-btn">
+          <button
+            type="button"
+            className="logout-btn"
+            onClick={() => {
+              onSignOut?.();
+              onClose?.();
+            }}
+          >
             <LogOut size={17} />
-            <span>Logout</span>
+            <span>Sign out</span>
           </button>
         </div>
       </aside>

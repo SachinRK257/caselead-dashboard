@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   AlertTriangle,
   BriefcaseBusiness,
@@ -9,50 +9,34 @@ import {
 } from "lucide-react";
 
 import BankCases from "../components/BankCases";
+import CaseAnalytics from "../components/CaseAnalytics";
+import TodayFocus from "../components/TodayFocus";
 import BankVisitCases from "../components/BankVisitCases";
-import Header from "../components/Header";
 import HighLiabilityCases from "../components/HighLiabilityCases";
 import Notifications from "../components/Notifications";
 import PendingDocuments from "../components/PendingDocuments";
 import RecentActivities from "../components/RecentActivities";
 import SalesTeam from "../components/SalesTeam";
-import Sidebar from "../components/Sidebar";
 import StatCard from "../components/StatCard";
 import TimelineCases from "../components/TimelineCases";
 
-import {
-  bankData,
-  cases,
-  currentUserId,
-  notifications,
-} from "../data/mockData";
-import {
-  enrichCases,
-  getSalesperson,
-  isHighLiability,
-  matchesSearch,
-} from "../utils/cases";
+import { bankData, currentUserId } from "../data/mockData";
+import { isHighLiability } from "../utils/cases";
 import { formatLongDate } from "../utils/format";
+import { useSettings } from "../context/settingsCore";
 
-export default function Dashboard() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [readNotificationIds, setReadNotificationIds] = useState(
-    () => new Set()
-  );
-
-  const currentUser = getSalesperson(currentUserId);
+export default function Dashboard({
+  cases: visibleCases = [],
+  allCases = [],
+  currentUser,
+  searchQuery = "",
+  today,
+  notificationItems = [],
+  unreadCount = 0,
+  onMarkNotificationRead,
+}) {
+  const settings = useSettings();
   const firstName = currentUser?.name.split(" ")[0] ?? "there";
-
-  // Pinned once per mount so every panel reports against the same "today".
-  const today = useMemo(() => new Date(), []);
-
-  const allCases = useMemo(() => enrichCases(cases, today), [today]);
-
-  const visibleCases = useMemo(
-    () => allCases.filter((item) => matchesSearch(item, searchQuery)),
-    [allCases, searchQuery]
-  );
 
   const stats = useMemo(() => {
     const count = (predicate) => visibleCases.filter(predicate).length;
@@ -63,7 +47,9 @@ export default function Dashboard() {
       pendingAllocation: count(
         (item) => item.allocationStatus === "NOT_ALLOCATED"
       ),
-      highLiability: count(isHighLiability),
+      highLiability: count((item) =>
+        isHighLiability(item, settings.highLiabilityThreshold)
+      ),
       dueSoon: count((item) => item.timelineStatus === "DUE_SOON"),
       overdue: count((item) => item.timelineStatus === "OVERDUE"),
       pendingVisits: count((item) => item.bankVisit === "VISIT_PENDING"),
@@ -71,144 +57,107 @@ export default function Dashboard() {
         (item) => item.documents === "DOCUMENTS_PENDING"
       ),
     };
-  }, [visibleCases]);
-
-  const notificationItems = useMemo(
-    () =>
-      notifications.map((item) => ({
-        ...item,
-        unread: item.unread && !readNotificationIds.has(item.id),
-      })),
-    [readNotificationIds]
-  );
-
-  const unreadCount = notificationItems.filter((item) => item.unread).length;
-
-  const markNotificationRead = useCallback((id) => {
-    setReadNotificationIds((current) => {
-      if (current.has(id)) return current;
-
-      const next = new Set(current);
-      next.add(id);
-      return next;
-    });
-  }, []);
-
-  const closeSidebar = useCallback(() => setMobileOpen(false), []);
+  }, [visibleCases, settings.highLiabilityThreshold]);
 
   return (
-    <div className="app-layout">
-      <Sidebar user={currentUser} mobileOpen={mobileOpen} onClose={closeSidebar} />
+    <>
+      <div className="welcome-row">
+        <div>
+          <h2>Good morning, {firstName} 👋</h2>
+          <p>Here&apos;s what&apos;s happening with your case leads today.</p>
+        </div>
 
-      <main className="main-content">
-        <Header
-          user={currentUser}
-          onOpenSidebar={() => setMobileOpen(true)}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          unreadCount={unreadCount}
+        <button type="button" className="date-button">
+          {formatLongDate(today)}
+        </button>
+      </div>
+
+      {searchQuery.trim() && (
+        <p className="search-summary" role="status">
+          {visibleCases.length} of {allCases.length} cases match &ldquo;
+          {searchQuery.trim()}&rdquo;
+        </p>
+      )}
+
+      <TodayFocus cases={visibleCases} />
+
+      <section className="stats-grid" aria-label="Case summary">
+        <StatCard
+          title="Total Cases"
+          value={stats.totalCases}
+          description="All your cases"
+          icon={BriefcaseBusiness}
         />
 
-        <div className="dashboard-content">
-          <div className="welcome-row">
-            <div>
-              <h2>Good morning, {firstName} 👋</h2>
-              <p>Here&apos;s what&apos;s happening with your case leads today.</p>
-            </div>
+        <StatCard
+          title="Not Assigned"
+          value={stats.pendingAllocation}
+          description="No one assigned"
+          icon={Clock3}
+        />
 
-            <button type="button" className="date-button">
-              {formatLongDate(today)}
-            </button>
-          </div>
+        <StatCard
+          title="Big Amount"
+          value={stats.highLiability}
+          description="Handle these first"
+          icon={AlertTriangle}
+        />
 
-          {searchQuery.trim() && (
-            <p className="search-summary" role="status">
-              {visibleCases.length} of {allCases.length} cases match &ldquo;
-              {searchQuery.trim()}&rdquo;
-            </p>
-          )}
+        <StatCard
+          title="Due Soon"
+          value={stats.dueSoon}
+          description="Due within 7 days"
+          icon={CalendarClock}
+          className="warning-card"
+        />
 
-          <section className="stats-grid" aria-label="Case summary">
-            <StatCard
-              title="Total Cases"
-              value={stats.totalCases}
-              description="All active cases"
-              icon={BriefcaseBusiness}
-            />
+        <StatCard
+          title="Overdue"
+          value={stats.overdue}
+          description="Past the deadline"
+          icon={AlertTriangle}
+          className="danger-card"
+        />
 
-            <StatCard
-              title="Pending Allocation"
-              value={stats.pendingAllocation}
-              description="Cases awaiting allocation"
-              icon={Clock3}
-            />
+        <StatCard
+          title="Bank Visits"
+          value={stats.pendingVisits}
+          description="Still to visit"
+          icon={Building2}
+        />
 
-            <StatCard
-              title="High Liability"
-              value={stats.highLiability}
-              description="Above priority threshold"
-              icon={AlertTriangle}
-            />
+        <StatCard
+          title="Documents"
+          value={stats.pendingDocuments}
+          description="Papers to collect"
+          icon={FileWarning}
+        />
+      </section>
 
-            <StatCard
-              title="Due Soon"
-              value={stats.dueSoon}
-              description="Requires attention"
-              icon={CalendarClock}
-              className="warning-card"
-            />
+      <section className="dashboard-two-column">
+        <BankCases cases={visibleCases} />
+        <TimelineCases cases={visibleCases} />
+      </section>
 
-            <StatCard
-              title="Overdue"
-              value={stats.overdue}
-              description="Action required"
-              icon={AlertTriangle}
-              className="danger-card"
-            />
+      <SalesTeam cases={visibleCases} currentUserId={currentUserId} />
 
-            <StatCard
-              title="Bank Visits"
-              value={stats.pendingVisits}
-              description="Visits pending"
-              icon={Building2}
-            />
+      <CaseAnalytics cases={visibleCases} />
 
-            <StatCard
-              title="Documents"
-              value={stats.pendingDocuments}
-              description="Documents pending"
-              icon={FileWarning}
-            />
-          </section>
+      <HighLiabilityCases cases={visibleCases} />
 
-          <section className="dashboard-two-column">
-            <BankCases />
-            <TimelineCases cases={visibleCases} />
-          </section>
+      <BankVisitCases cases={visibleCases} />
 
-          <SalesTeam cases={visibleCases} currentUserId={currentUserId} />
+      <section className="dashboard-two-column">
+        <Notifications
+          notifications={notificationItems}
+          unreadCount={unreadCount}
+          onMarkRead={onMarkNotificationRead}
+        />
+        <RecentActivities />
+      </section>
 
-          <HighLiabilityCases cases={visibleCases} />
+      <PendingDocuments cases={visibleCases} />
 
-          <BankVisitCases cases={visibleCases} />
-
-          <section className="dashboard-two-column">
-            <Notifications
-              notifications={notificationItems}
-              unreadCount={unreadCount}
-              onMarkRead={markNotificationRead}
-            />
-            <RecentActivities />
-          </section>
-
-          <PendingDocuments />
-
-          <footer className="dashboard-footer">
-            <span>Case Management Dashboard</span>
-            <span>Last updated just now</span>
-          </footer>
-        </div>
-      </main>
-    </div>
+    </>
   );
 }

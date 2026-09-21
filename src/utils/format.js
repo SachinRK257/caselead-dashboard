@@ -66,12 +66,15 @@ export const TIMELINE_STATUS = {
 /** Anything inside a week needs attention; anything past its date is overdue. */
 export const DUE_SOON_THRESHOLD_DAYS = 7;
 
-export function getTimelineStatus(remainingDays) {
+export function getTimelineStatus(
+  remainingDays,
+  dueSoonDays = DUE_SOON_THRESHOLD_DAYS
+) {
   if (remainingDays === null || remainingDays === undefined) {
     return TIMELINE_STATUS.ON_TRACK;
   }
   if (remainingDays < 0) return TIMELINE_STATUS.OVERDUE;
-  if (remainingDays <= DUE_SOON_THRESHOLD_DAYS) return TIMELINE_STATUS.DUE_SOON;
+  if (remainingDays <= dueSoonDays) return TIMELINE_STATUS.DUE_SOON;
   return TIMELINE_STATUS.ON_TRACK;
 }
 
@@ -97,4 +100,38 @@ export function humanizeEnum(value) {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+/**
+ * Short rupee amount in the units people actually speak: "2.5 Cr", "95 L".
+ *
+ * A figure like 10,66,00,000 has to be counted digit by digit before it means
+ * anything. The exact amount is never lost - callers pair this with the full
+ * figure in a title attribute, and the tables still print it in full.
+ */
+export function formatMoneyShort(value) {
+  if (typeof value !== "number" || Number.isNaN(value)) return "-";
+
+  const CRORE = 10000000;
+  const LAKH = 100000;
+
+  if (Math.abs(value) >= CRORE) {
+    return `₹${trimZeros(value / CRORE)} Cr`;
+  }
+  if (Math.abs(value) >= LAKH) {
+    return `₹${trimZeros(value / LAKH)} L`;
+  }
+
+  return `₹${formatAmount(value)}`;
+}
+
+/** 2.50 -> "2.5", 3.00 -> "3", 10.66 -> "10.66" */
+function trimZeros(n) {
+  return String(Number(n.toFixed(2)));
+}
+
+/** The full figure, for tooltips beside a shortened one. */
+export function formatMoneyFull(value) {
+  if (typeof value !== "number" || Number.isNaN(value)) return "-";
+  return `₹${formatAmount(value)}`;
 }

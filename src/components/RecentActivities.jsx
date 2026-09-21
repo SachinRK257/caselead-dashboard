@@ -23,8 +23,8 @@ export default function RecentActivities() {
     <div className="panel">
       <div className="panel-header">
         <div>
-          <h2>Recent Activities</h2>
-          <p>Latest changes made to cases</p>
+          <h2>Recent Work</h2>
+          <p>What was done lately</p>
         </div>
 
         <button type="button" className="text-button">

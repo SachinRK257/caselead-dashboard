@@ -1,60 +1,58 @@
-import { ArrowUpRight, Building2 } from "lucide-react";
+import { useMemo } from "react";
+
+import BarChart from "./charts/BarChart";
+import { ChartShell } from "./charts/ChartShell";
+import { buildPropertyMix } from "../utils/cases";
 import { bankData } from "../data/mockData";
 
-export default function BankCases() {
-  const total = bankData.reduce((sum, bank) => sum + bank.count, 0);
+/**
+ * Two views of how the book splits.
+ *
+ * The bank chart counts the whole portfolio while the property chart counts
+ * only the cases loaded into this view, so each chart states its own scope -
+ * side by side, unlabelled, the two totals would look like a contradiction.
+ */
+export default function BankCases({ cases = [] }) {
+  const byBank = useMemo(
+    () =>
+      [...bankData]
+        .map((bank) => ({ key: bank.name, label: bank.name, value: bank.count }))
+        .sort((a, b) => b.value - a.value),
+    []
+  );
 
-  // Guard the empty case: Math.max() of nothing is -Infinity.
-  const max = bankData.length
-    ? Math.max(...bankData.map((bank) => bank.count))
-    : 0;
+  const byProperty = useMemo(() => buildPropertyMix(cases), [cases]);
+  const total = byBank.reduce((sum, bank) => sum + bank.value, 0);
 
   return (
     <div className="panel bank-panel">
       <div className="panel-header">
         <div>
-          <h2>Cases by Bank</h2>
-          <p>Distribution of cases across banks</p>
+          <h2>Where Your Cases Are</h2>
+          <p>Split by bank and by property</p>
         </div>
-
-        <button type="button" className="text-button">
-          View all <ArrowUpRight size={15} aria-hidden="true" />
-        </button>
       </div>
 
-      <div className="bank-list">
-        {bankData.map((bank) => {
-          const share = max ? Math.round((bank.count / max) * 100) : 0;
+      <div className="panel-charts">
+        <ChartShell
+          title="By bank"
+          caption={`All ${total} cases in the book`}
+          columns={["Bank", "Cases"]}
+          rows={byBank.map((b) => [b.label, b.value])}
+        >
+          {/* One hue for every bar. Banks are nominal categories, so shading
+              by size would only restate the bar length. */}
+          <BarChart data={byBank} labelWidth={116} />
+        </ChartShell>
 
-          return (
-            <div className="bank-row" key={bank.name}>
-              <div className="bank-name">
-                <div className="bank-icon" aria-hidden="true">
-                  <Building2 size={17} />
-                </div>
-                <span>{bank.name}</span>
-              </div>
-
-              <div className="bank-progress">
-                <div
-                  className="progress-track"
-                  role="progressbar"
-                  aria-valuenow={bank.count}
-                  aria-valuemin={0}
-                  aria-valuemax={max}
-                  aria-label={`${bank.name}: ${bank.count} cases`}
-                >
-                  <div
-                    className="progress-fill"
-                    style={{ width: `${share}%` }}
-                  />
-                </div>
-              </div>
-
-              <strong>{bank.count}</strong>
-            </div>
-          );
-        })}
+        <ChartShell
+          title="By property type"
+          caption={`The ${cases.length} cases on your screen`}
+          columns={["Property type", "Cases"]}
+          rows={byProperty.map((p) => [p.label, p.value])}
+        >
+          <BarChart data={byProperty} labelWidth={126} />
+        </ChartShell>
       </div>
 
       <div className="bank-total">

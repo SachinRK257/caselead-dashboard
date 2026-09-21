@@ -2,7 +2,13 @@ import { useMemo, useState } from "react";
 import { Building2, CalendarDays } from "lucide-react";
 
 import EmptyState from "./EmptyState";
-import { describeAssignee, VISIT_STATUS_LABELS } from "../utils/cases";
+import StackedBar from "./charts/StackedBar";
+import { VISIT_COLORS } from "./charts/chartTokens";
+import {
+  buildVisitMix,
+  describeAssignee,
+  VISIT_STATUS_LABELS,
+} from "../utils/cases";
 import { formatDate, humanizeEnum } from "../utils/format";
 
 const COLUMN_COUNT = 8;
@@ -10,6 +16,10 @@ const MAX_ROWS = 6;
 
 export default function BankVisitCases({ cases = [] }) {
   const [statusFilter, setStatusFilter] = useState("OPEN");
+
+  // The mix is of every case in scope, not of the current selection -
+  // otherwise picking a status would collapse the chart to one segment.
+  const mix = useMemo(() => buildVisitMix(cases), [cases]);
 
   const rows = useMemo(() => {
     const filtered =
@@ -26,8 +36,8 @@ export default function BankVisitCases({ cases = [] }) {
     <div className="panel full-panel">
       <div className="panel-header">
         <div>
-          <h2>Bank Visit Tracker</h2>
-          <p>Upcoming and pending bank visits</p>
+          <h2>Bank Visits</h2>
+          <p>Who to visit, and when</p>
         </div>
 
         <select
@@ -46,6 +56,21 @@ export default function BankVisitCases({ cases = [] }) {
         </select>
       </div>
 
+      <div className="panel-chart">
+        <StackedBar
+          selected={statusFilter}
+          onSelect={setStatusFilter}
+          segments={Object.entries(VISIT_STATUS_LABELS).map(
+            ([key, label]) => ({
+              key,
+              label,
+              value: mix[key] ?? 0,
+              color: VISIT_COLORS[key],
+            })
+          )}
+        />
+      </div>
+
       <div className="table-wrapper">
         <table className="data-table">
           <thead>
@@ -54,9 +79,9 @@ export default function BankVisitCases({ cases = [] }) {
               <th scope="col">Bank</th>
               <th scope="col">Branch</th>
               <th scope="col">Property</th>
-              <th scope="col">Visit Status</th>
-              <th scope="col">Assigned To</th>
-              <th scope="col">Expected Visit</th>
+              <th scope="col">Visit</th>
+              <th scope="col">Handled By</th>
+              <th scope="col">Visit Date</th>
               <th scope="col">Remarks</th>
             </tr>
           </thead>

@@ -5,6 +5,8 @@ import { initialsOf } from "../utils/cases";
 
 export default function Header({
   user,
+  title = "Case Dashboard",
+  subtitle = "",
   onOpenSidebar,
   searchQuery = "",
   onSearchChange,
@@ -38,8 +40,8 @@ export default function Header({
         </button>
 
         <div>
-          <h1>Case Dashboard</h1>
-          <p>Overview of your case leads</p>
+          <h1>{title}</h1>
+          {subtitle && <p>{subtitle}</p>}
         </div>
       </div>
 

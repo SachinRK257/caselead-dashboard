@@ -46,22 +46,22 @@ export const TIMELINE_STATUS_LABELS = {
  * so the dashboard stays accurate instead of reporting whatever was frozen
  * into the source data.
  */
-export function enrichCase(item, today = new Date()) {
+export function enrichCase(item, today = new Date(), dueSoonDays) {
   const remainingDays = daysUntil(item.requiredActionDate, today);
 
   return {
     ...item,
     remainingDays,
-    timelineStatus: getTimelineStatus(remainingDays),
+    timelineStatus: getTimelineStatus(remainingDays, dueSoonDays),
   };
 }
 
-export function enrichCases(list, today = new Date()) {
-  return list.map((item) => enrichCase(item, today));
+export function enrichCases(list, today = new Date(), dueSoonDays) {
+  return list.map((item) => enrichCase(item, today, dueSoonDays));
 }
 
-export function isHighLiability(item) {
-  return item.liability >= HIGH_LIABILITY_THRESHOLD;
+export function isHighLiability(item, threshold = HIGH_LIABILITY_THRESHOLD) {
+  return item.liability >= threshold;
 }
 
 const SEARCHABLE_FIELDS = [
@@ -163,4 +163,127 @@ export function buildTeamWorkload(cases) {
   });
 
   return rows.sort((a, b) => b.assigned - a.assigned || b.liability - a.liability);
+}
+
+/* ------------------------------------------------------- aggregations --- */
+
+/** Count cases per value of a field, preserving a fixed key order. */
+export function countByKey(cases, field, keys) {
+  const counts = Object.fromEntries(keys.map((k) => [k, 0]));
+
+  for (const item of cases) {
+    if (item[field] in counts) counts[item[field]] += 1;
+  }
+
+  return counts;
+}
+
+export function buildTimelineMix(cases) {
+  return countByKey(cases, "timelineStatus", [
+    "ON_TRACK",
+    "DUE_SOON",
+    "OVERDUE",
+  ]);
+}
+
+export function buildVisitMix(cases) {
+  return countByKey(cases, "bankVisit", Object.keys(VISIT_STATUS));
+}
+
+export function buildDocumentMix(cases) {
+  return countByKey(cases, "documents", Object.keys(DOCUMENT_STATUS));
+}
+
+/** Case count per bank, busiest first. */
+export function buildBankCounts(cases) {
+  const counts = new Map();
+  for (const item of cases) {
+    counts.set(item.bank, (counts.get(item.bank) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([label, value]) => ({ key: label, label, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
+/** Total liability per bank, largest first. */
+export function buildLiabilityByBank(cases) {
+  const totals = new Map();
+  for (const item of cases) {
+    totals.set(item.bank, (totals.get(item.bank) ?? 0) + item.liability);
+  }
+
+  return [...totals.entries()]
+    .map(([label, value]) => ({ key: label, label, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
+/** Case count per property type, largest first. */
+export function buildPropertyMix(cases) {
+  const counts = new Map();
+  for (const item of cases) {
+    counts.set(item.property, (counts.get(item.property) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([label, value]) => ({ key: label, label, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/**
+ * Cases per month of their demand notice, as a continuous series.
+ *
+ * Months with no cases are kept at zero rather than skipped: dropping them
+ * would compress the gaps and overstate how steady intake was.
+ */
+export function buildIntakeByMonth(cases) {
+  const stamps = cases
+    .map((item) => new Date(item.demandNoticeDate))
+    .filter((d) => !Number.isNaN(d.getTime()));
+
+  if (stamps.length === 0) return [];
+
+  const first = new Date(Math.min(...stamps));
+  const last = new Date(Math.max(...stamps));
+
+  const series = [];
+  const cursor = new Date(first.getFullYear(), first.getMonth(), 1);
+
+  while (
+    cursor.getFullYear() < last.getFullYear() ||
+    (cursor.getFullYear() === last.getFullYear() &&
+      cursor.getMonth() <= last.getMonth())
+  ) {
+    const year = cursor.getFullYear();
+    const month = cursor.getMonth();
+
+    series.push({
+      key: `${year}-${month}`,
+      label: MONTH_LABELS[month],
+      value: stamps.filter(
+        (d) => d.getFullYear() === year && d.getMonth() === month
+      ).length,
+    });
+
+    cursor.setMonth(month + 1);
+  }
+
+  return series;
+}
+
+/** Case count per city, largest first. */
+export function buildCityMix(cases) {
+  const counts = new Map();
+  for (const item of cases) {
+    counts.set(item.city, (counts.get(item.city) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([label, value]) => ({ key: label, label, value }))
+    .sort((a, b) => b.value - a.value);
 }

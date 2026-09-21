@@ -24,8 +24,8 @@ export default function Notifications({
     <div className="panel">
       <div className="panel-header">
         <div>
-          <h2>Notifications</h2>
-          <p>Important case updates</p>
+          <h2>Alerts</h2>
+          <p>Things you should know</p>
         </div>
 
         <span className="notification-count">{unreadCount} New</span>

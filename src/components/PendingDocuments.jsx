@@ -2,14 +2,24 @@ import { useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, FileText } from "lucide-react";
 
 import EmptyState from "./EmptyState";
-import { DOCUMENT_STATUS_LABELS, getSalesperson } from "../utils/cases";
+import {
+  buildDocumentMix,
+  DOCUMENT_STATUS_LABELS,
+  getSalesperson,
+} from "../utils/cases";
 import { humanizeEnum } from "../utils/format";
+import Meter from "./charts/Meter";
+import { DOCUMENT_COLORS } from "./charts/chartTokens";
 import { pendingDocuments } from "../data/mockData";
 
 const COLUMN_COUNT = 7;
 
-export default function PendingDocuments() {
+export default function PendingDocuments({ cases = [] }) {
   const [statusFilter, setStatusFilter] = useState("ALL");
+
+  // Measured across cases, not the queue rows below: the queue only ever
+  // holds outstanding items, so it could never show anything but 0% complete.
+  const docMix = useMemo(() => buildDocumentMix(cases), [cases]);
 
   const rows = useMemo(() => {
     if (statusFilter === "ALL") return pendingDocuments;
@@ -20,8 +30,8 @@ export default function PendingDocuments() {
     <div className="panel full-panel">
       <div className="panel-header">
         <div>
-          <h2>Pending Documents</h2>
-          <p>Cases requiring additional information</p>
+          <h2>Missing Documents</h2>
+          <p>Papers still to collect from borrowers</p>
         </div>
 
         <select
@@ -39,15 +49,26 @@ export default function PendingDocuments() {
         </select>
       </div>
 
+      <div className="panel-chart">
+        {/* Two classes are a meter, not a two-slice pie. */}
+        <Meter
+          value={docMix.DOCUMENTS_COMPLETE}
+          total={docMix.DOCUMENTS_COMPLETE + docMix.DOCUMENTS_PENDING}
+          fillLabel="Documents complete"
+          restLabel="Documents pending"
+          fill={DOCUMENT_COLORS.DOCUMENTS_COMPLETE}
+        />
+      </div>
+
       <div className="table-wrapper">
         <table className="data-table">
           <thead>
             <tr>
               <th scope="col">Borrower</th>
               <th scope="col">Bank</th>
-              <th scope="col">Missing Document</th>
-              <th scope="col">Assigned To</th>
-              <th scope="col">Pending Since</th>
+              <th scope="col">What Is Missing</th>
+              <th scope="col">Handled By</th>
+              <th scope="col">Waiting</th>
               <th scope="col">Status</th>
               <th scope="col">Action</th>
             </tr>
