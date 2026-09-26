@@ -3,6 +3,82 @@
 A React + Vite dashboard for tracking case leads: allocation status, action
 timelines, bank visits and pending documents.
 
+## Current state
+
+**Case Lead dashboard** - a single page, no routing. A bank filter at the top
+drives everything below it; type a bank name, pick from the list, or click a
+bar in the chart. All three stay in sync.
+
+`BankFilter` is a combobox rather than a `<select>`: a native select has no
+placeholder, and its first option would have to double as the "no filter"
+state, which reads as a real choice. The combobox gets a true `Bank name...`
+placeholder, per-bank counts in the list, type-to-filter, arrow-key navigation
+and a clear button.
+
+### The summary strip
+
+Every figure in the toolbar describes the same population. When a bank is
+picked, the lender count drops to 1 rather than staying at the book-wide 29 -
+otherwise "Cases 22" would sit beside "Lenders 29" and invite reading the two
+together.
+
+### The bank filter appears twice
+
+The same control is rendered in the **Cases by Bank** header and again in
+**Notices Served**, so a long page can be narrowed from wherever you are. Both
+read and write one piece of state, so they can never disagree - picking a bank
+in either, or clicking a bar in the chart, updates all three.
+
+Two things that follow from rendering it twice: the listbox id comes from
+`useId` rather than a constant, and the text shown in the box is adopted from
+the `value` prop during render, so a selection made elsewhere is never left
+looking like an empty filter.
+
+### The lender panel
+
+`banks` in the mock data is the master list of all 32 lenders. The filter offers
+every one of them, so a lender can always be looked up even in a month where it
+has no live case - those show a dimmed `0`. The bank chart only plots lenders
+that do have cases, and every chart shows its top 5 with the rest behind its own
+Show all toggle - 32 bars is more than anyone scans. The two notice charts each
+carry their own toggle, because the stages reach different numbers of lenders
+(24 and 27) and one shared control would have had to misreport at least one.
+
+A chart's Table view lists exactly the rows the chart is drawing, expanded or
+not. Letting the table quietly run to 29 rows while the chart said "top 5" made
+the two disagree about what was being shown.
+
+- **A toolbar** carrying the bank filter and a four-figure summary of the
+  current scope
+- **Cases by Bank** and **Cases by Property Type**, side by side
+- **Notices Served** - two side-by-side bar charts, demand notice and
+  possession notice, each counted per bank
+
+Each notice stage gets its own chart and its own baseline rather than sharing a
+stacked bar, so comparing banks within a stage is a straight length read. They
+are sorted independently, which is what shows that Union Bank leads on demand
+notices while SBI leads on possession notices.
+
+Every chart has a Table toggle, so values are reachable without colour or hover.
+
+A **SARFAESI dashboard** is planned next, on this same page.
+
+### Notice stage
+
+A case is at **demand notice** until a possession notice is served, and under
+s.13(4) that only follows once the 60-day s.13(2) window has run. The mock data
+respects that order: no notice is dated in the future, no possession notice is
+served less than 60 days after its demand notice, and the required action date
+always falls after the latest notice. 17 of the 48 cases are still inside their
+demand-notice window.
+
+### A note on the numbers
+
+`bankData` in the mock file still holds a 400-case portfolio figure. The charts
+deliberately do **not** use it - they count the 48 loaded cases, so every chart
+total agrees with every other one.
+
+
 ## Getting started
 
 ```bash
@@ -20,63 +96,30 @@ npm run dev
 ## Project structure
 
 ```
-src/
-├── main.jsx              # React entry point
-├── App.jsx               # Renders the dashboard
-├── index.css             # All application styling
-├── components/           # Presentational + panel components
-│   ├── BankCases.jsx         # "Where Your Cases Are" - bank + property
-│   ├── BankVisitCases.jsx    # "Bank Visits" table
-│   ├── TodayFocus.jsx        # Plain-language "start here" strip
-│   ├── EmptyState.jsx        # Shared "nothing to show" placeholder
-│   ├── Header.jsx            # Top bar: search, notifications, profile
-│   ├── HighLiabilityCases.jsx# Priority cases table + amount filter
-│   ├── Notifications.jsx     # Notification feed
-│   ├── PendingDocuments.jsx  # Missing document tracker
-│   ├── RecentActivities.jsx  # Activity feed
-│   ├── SalesTeam.jsx         # Case load per salesperson, by city
-│   ├── Sidebar.jsx           # Navigation drawer
-│   ├── StatCard.jsx          # Summary tile
-│   ├── StatusBadge.jsx       # Shared timeline status pill
-│   └── TimelineCases.jsx     # Due soon / overdue overview
-├── data/mockData.js      # Sample cases, salespeople, notifications, activities
-├── pages/Dashboard.jsx   # Composes the dashboard, owns shared state
-└── utils/
-    ├── cases.js          # Case enrichment, team lookup, status enums, filtering
-    └── format.js         # Currency, date and duration formatting
+src/App.jsx
+src/index.css
+src/main.jsx
+src/assets/hero.png
+src/assets/react.svg
+src/assets/vite.svg
+src/components/EmptyState.jsx
+src/components/Header.jsx
+src/components/Sidebar.jsx
+src/components/StatCard.jsx
+src/components/StatusBadge.jsx
+src/components/charts/AreaChart.jsx
+src/components/charts/BarChart.jsx
+src/components/charts/ChartShell.jsx
+src/components/charts/Meter.jsx
+src/components/charts/StackedBar.jsx
+src/components/charts/chartTokens.js
+src/components/charts/useHover.js
+src/data/mockData.js
+src/pages/Dashboard.jsx
+src/utils/cases.js
+src/utils/format.js
 ```
 
-## Navigation
-
-Every sidebar item is a real page, addressed by hash (`#/deadlines`), so the
-back button, refresh and a pasted link all work. Routing is ~70 lines in
-`src/router.js` rather than a dependency - the whole requirement is "one of
-seven views, addressable, with a working back button", which the hash already
-provides, and a hash URL needs no server rewrite rule to host.
-
-| Route | Page |
-| ----- | ---- |
-| `#/dashboard` | The overview |
-| `#/cases` | Every case, with bank / deadline / visit filters and sorting |
-| `#/deadlines` | Cases grouped past-due → due soon → on track |
-| `#/bank-visits` | The visit tracker, full width |
-| `#/documents` | The document queue plus the cases held up by it |
-| `#/assign` | Hand an unowned case to a salesperson |
-| `#/settings` | The two thresholds that decide what is urgent |
-
-`App.jsx` owns the shell and the shared state (search, read notifications,
-session assignments), so moving between pages keeps them rather than resetting.
-**Sidebar badges are counted from the case list**, so they cannot drift the way
-the previous hardcoded 5 / 8 / 6 had.
-
-Two things are session- or device-scoped, and the UI says so rather than
-implying a server:
-
-- **Assignments** made on `#/assign` last while the page is open.
-- **Settings** persist to `localStorage` - they survive a refresh but do not
-  follow you to another device.
-- **Sign out** clears the session state; there is no auth behind this build, so
-  it does not pretend to end a server session.
 
 ## Writing for the reader
 
@@ -99,46 +142,7 @@ case, so there is nothing to compare before acting. `Extra Charts` is collapsed
 by default - the analysis charts are useful to a manager but were pushing the
 working panels down the page for everyone else.
 
-## Charts
 
-Charts are hand-built SVG/flex primitives in `src/components/charts/` - no
-charting dependency. Each form was picked from the data's job:
-
-| Chart | Form | Why |
-| ----- | ---- | --- |
-| Cases by bank, property, city, liability | horizontal bars | magnitude across nominal categories |
-| Timeline status, bank-visit status | stacked bar | part-to-whole, few classes |
-| Documents complete | meter | a single ratio - not a two-slice pie |
-| Demand notices by month | area + crosshair | trend over time, one series |
-| Sales-team case load | stacked mini-bar | magnitude *and* risk composition |
-
-The seven stat tiles stay tiles. A single current value is a stat tile, not a
-one-bar bar chart.
-
-### Colour
-
-`charts/chartTokens.js` holds the palettes, and they were **validated, not
-eyeballed**. The UI badge colours could not be reused as chart fills: badge
-orange `#c2410c` and badge red `#b91c1c` measure only dE 6.1 apart in normal
-vision, so "Due Soon" and "Overdue" were indistinguishable as touching
-segments. The chart fills are re-stepped in the same hue families and clear the
-gates (worst adjacent CVD dE 9.1). Badges keep their darker text colours, which
-are governed by text contrast rather than that gate.
-
-Nominal categories (banks, cities, property types) all use **one** hue. Shading
-each bar darker-where-bigger would double-encode the bar length and spend the
-only free channel restating what the chart already shows.
-
-Because several validated fills sit below 3:1 against the white panel, no value
-is reachable by colour or hover alone: bars carry their value at the tip,
-stacked segments are itemised in the legend, and each analytics chart has a
-Table toggle.
-
-### Filters
-
-The timeline and bank-visit stacked bars **are** their panel's filter - click a
-segment to scope the table below. That avoids a chart sitting next to a second,
-competing control for the same dimension.
 
 ## Data model
 

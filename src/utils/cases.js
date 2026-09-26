@@ -1,5 +1,5 @@
 import { daysUntil, getTimelineStatus, isEmptyValue } from "./format";
-import { salespeople } from "../data/mockData";
+import { banks, salespeople } from "../data/mockData";
 
 /** Liability at or above this is treated as a priority case. */
 export const HIGH_LIABILITY_THRESHOLD = 18000000;
@@ -203,7 +203,24 @@ export function buildBankCounts(cases) {
 
   return [...counts.entries()]
     .map(([label, value]) => ({ key: label, label, value }))
-    .sort((a, b) => b.value - a.value);
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
+}
+
+/**
+ * Every lender on the panel with its case count, zeros included.
+ *
+ * The filter offers the whole panel so a lender can always be looked up, even
+ * in a month where it happens to have no live case.
+ */
+export function buildPanelCounts(cases) {
+  const counts = new Map(banks.map((b) => [b, 0]));
+  for (const item of cases) {
+    counts.set(item.bank, (counts.get(item.bank) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([label, value]) => ({ key: label, label, value }))
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
 }
 
 /** Total liability per bank, largest first. */
@@ -285,5 +302,57 @@ export function buildCityMix(cases) {
 
   return [...counts.entries()]
     .map(([label, value]) => ({ key: label, label, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
+/* --------------------------------------------------------- notice stage --- */
+
+export const NOTICE_STAGE = {
+  DEMAND: "DEMAND",
+  POSSESSION: "POSSESSION",
+};
+
+export const NOTICE_STAGE_LABELS = {
+  DEMAND: "Demand notice",
+  POSSESSION: "Possession notice",
+};
+
+/**
+ * Where a case has reached in the notice sequence.
+ *
+ * A possession notice under s.13(4) only follows once the 60-day demand notice
+ * window under s.13(2) has run, so a case carrying no possession date is still
+ * inside that window rather than missing data.
+ */
+export function getNoticeStage(item) {
+  return isEmptyValue(item.possessionNoticeDate)
+    ? NOTICE_STAGE.DEMAND
+    : NOTICE_STAGE.POSSESSION;
+}
+
+/** Case counts per notice stage, for the scope handed in. */
+export function buildNoticeStage(cases) {
+  const counts = { DEMAND: 0, POSSESSION: 0 };
+  for (const item of cases) counts[getNoticeStage(item)] += 1;
+  return counts;
+}
+
+/** Notice stage split per bank, banks with most cases first. */
+export function buildNoticeStageByBank(cases) {
+  const map = new Map();
+
+  for (const item of cases) {
+    const entry = map.get(item.bank) ?? {
+      key: item.bank,
+      label: item.bank,
+      DEMAND: 0,
+      POSSESSION: 0,
+    };
+    entry[getNoticeStage(item)] += 1;
+    map.set(item.bank, entry);
+  }
+
+  return [...map.values()]
+    .map((e) => ({ ...e, value: e.DEMAND + e.POSSESSION }))
     .sort((a, b) => b.value - a.value);
 }

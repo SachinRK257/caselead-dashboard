@@ -50,6 +50,15 @@ export const VISIT_COLORS = {
   VISIT_CANCELLED: "#e34948",
 };
 
+/* Notice stage. Validated against the panel surface:
+   adjacent CVD dE 41.0 (protan) / 39.6 (tritan), normal-vision dE 45.9.
+   Amber carries a sub-3:1 contrast WARN, so the relief rule applies - the
+   stacked legend prints every value and ChartShell ships the table view. */
+export const NOTICE_COLORS = {
+  DEMAND: "#eda100",
+  POSSESSION: "#4a3aa7",
+};
+
 export const DOCUMENT_COLORS = {
   DOCUMENTS_COMPLETE: "#2563eb",
   DOCUMENTS_PENDING: "#eda100",

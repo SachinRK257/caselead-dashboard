@@ -17,6 +17,8 @@ export default function BarChart({
   color = CHART.series,
   formatValue = (v) => String(v),
   labelWidth = 116,
+  onSelect,
+  selected,
 }) {
   const { hover, show, hide } = useHover();
 
@@ -31,13 +33,23 @@ export default function BarChart({
       {data.map((item, i) => {
         const share = max > 0 ? (item.value / max) * 100 : 0;
 
+        const key = item.key ?? item.label;
+        const isSelected = selected === key;
+        // Dim the rest only when something is picked, so the selection reads
+        // as the subject and the others as context.
+        const dimmed = selected != null && !isSelected;
+
         return (
           <button
             type="button"
-            key={item.key ?? item.label}
-            className="bar-row"
+            key={key}
+            className={`bar-row ${onSelect ? "is-clickable" : ""} ${
+              isSelected ? "is-selected" : ""
+            }`}
             style={{ gridTemplateColumns: `${labelWidth}px 1fr auto` }}
             aria-label={`${item.label}: ${formatValue(item.value)}`}
+            aria-pressed={onSelect ? isSelected : undefined}
+            onClick={onSelect ? () => onSelect(isSelected ? null : key) : undefined}
             onMouseEnter={(e) => show(i, e)}
             onMouseLeave={hide}
             onFocus={(e) => show(i, e)}
@@ -51,7 +63,7 @@ export default function BarChart({
                 style={{
                   width: `${share}%`,
                   background: color,
-                  opacity: hover && hover.index !== i ? 0.55 : 1,
+                  opacity: dimmed || (hover && hover.index !== i) ? 0.55 : 1,
                 }}
               />
             </span>

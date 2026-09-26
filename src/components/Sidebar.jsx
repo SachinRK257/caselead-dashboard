@@ -1,39 +1,19 @@
 import { useEffect } from "react";
-import {
-  Building2,
-  CalendarClock,
-  FileWarning,
-  LayoutDashboard,
-  LogOut,
-  Scale,
-  Settings,
-  Users,
-  X,
-} from "lucide-react";
+import { LayoutDashboard, X } from "lucide-react";
 
 import { initialsOf } from "../utils/cases";
 
-/* Ids double as route names; `counts` supplies the badge so it can never
-   drift from the case list the way a hardcoded number does. */
 const NAV_ITEMS = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "cases", label: "All Cases", icon: Scale },
-  { id: "deadlines", label: "Deadlines", icon: CalendarClock },
-  { id: "bank-visits", label: "Bank Visits", icon: Building2 },
-  { id: "documents", label: "Documents", icon: FileWarning },
-  { id: "assign", label: "Assign Cases", icon: Users },
+  { id: "case-lead", label: "Case Lead", icon: LayoutDashboard },
 ];
-
-const SETTINGS_ITEMS = [{ id: "settings", label: "Settings", icon: Settings }];
 
 export default function Sidebar({
   user,
   mobileOpen = false,
   onClose,
-  activeItem = "dashboard",
+  activeItem = "case-lead",
   counts = {},
   onNavigate,
-  onSignOut,
 }) {
   // Escape is the expected way out of an overlay drawer.
   useEffect(() => {
@@ -108,11 +88,8 @@ export default function Sidebar({
           </button>
         </div>
 
-        <p className="sidebar-label">MENU</p>
+        <p className="sidebar-label">DASHBOARD</p>
         <nav className="sidebar-nav">{NAV_ITEMS.map(renderNavItem)}</nav>
-
-        <p className="sidebar-label">GENERAL</p>
-        <nav className="sidebar-nav">{SETTINGS_ITEMS.map(renderNavItem)}</nav>
 
         <div className="sidebar-bottom">
           <div className="profile-card">
@@ -125,17 +102,6 @@ export default function Sidebar({
             </div>
           </div>
 
-          <button
-            type="button"
-            className="logout-btn"
-            onClick={() => {
-              onSignOut?.();
-              onClose?.();
-            }}
-          >
-            <LogOut size={17} />
-            <span>Sign out</span>
-          </button>
         </div>
       </aside>
     </>

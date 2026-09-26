@@ -1,163 +1,174 @@
-import { useMemo } from "react";
-import {
-  AlertTriangle,
-  BriefcaseBusiness,
-  Building2,
-  CalendarClock,
-  Clock3,
-  FileWarning,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { FileText, Gavel } from "lucide-react";
 
-import BankCases from "../components/BankCases";
-import CaseAnalytics from "../components/CaseAnalytics";
-import TodayFocus from "../components/TodayFocus";
-import BankVisitCases from "../components/BankVisitCases";
-import HighLiabilityCases from "../components/HighLiabilityCases";
-import Notifications from "../components/Notifications";
-import PendingDocuments from "../components/PendingDocuments";
-import RecentActivities from "../components/RecentActivities";
-import SalesTeam from "../components/SalesTeam";
+import BankFilter from "../components/BankFilter";
 import StatCard from "../components/StatCard";
-import TimelineCases from "../components/TimelineCases";
+import BarChart from "../components/charts/BarChart";
+import { ChartShell } from "../components/charts/ChartShell";
+import {
+  buildBankCounts,
+  buildNoticeStage,
+  buildPanelCounts,
+  buildPropertyMix,
+} from "../utils/cases";
 
-import { bankData, currentUserId } from "../data/mockData";
-import { isHighLiability } from "../utils/cases";
-import { formatLongDate } from "../utils/format";
-import { useSettings } from "../context/settingsCore";
+/** Show-all control for a capped chart. Rendered only when there is a tail. */
+function MoreButton({ shown, total, cap, onToggle, noun }) {
+  if (total - cap <= 0) return null;
 
-export default function Dashboard({
-  cases: visibleCases = [],
-  allCases = [],
-  currentUser,
-  searchQuery = "",
-  today,
-  notificationItems = [],
-  unreadCount = 0,
-  onMarkNotificationRead,
-}) {
-  const settings = useSettings();
-  const firstName = currentUser?.name.split(" ")[0] ?? "there";
+  return (
+    <button type="button" className="disclosure chart-more" onClick={onToggle}>
+      {shown
+        ? `Show top ${cap} only`
+        : `Show all ${total} ${noun} (${total - cap} more)`}
+    </button>
+  );
+}
 
-  const stats = useMemo(() => {
-    const count = (predicate) => visibleCases.filter(predicate).length;
+// 32 lenders is too long a chart to scan; the rest are one click away.
+const TOP = 5;
 
-    return {
-      // The bank breakdown is the book of record for the portfolio size.
-      totalCases: bankData.reduce((sum, bank) => sum + bank.count, 0),
-      pendingAllocation: count(
-        (item) => item.allocationStatus === "NOT_ALLOCATED"
-      ),
-      highLiability: count((item) =>
-        isHighLiability(item, settings.highLiabilityThreshold)
-      ),
-      dueSoon: count((item) => item.timelineStatus === "DUE_SOON"),
-      overdue: count((item) => item.timelineStatus === "OVERDUE"),
-      pendingVisits: count((item) => item.bankVisit === "VISIT_PENDING"),
-      pendingDocuments: count(
-        (item) => item.documents === "DOCUMENTS_PENDING"
-      ),
-    };
-  }, [visibleCases, settings.highLiabilityThreshold]);
+export default function Dashboard({ cases = [] }) {
+  const [bank, setBank] = useState(null);
+  const [showAllBanks, setShowAllBanks] = useState(false);
+
+  const byBank = useMemo(() => buildBankCounts(cases), [cases]);
+  const panel = useMemo(() => buildPanelCounts(cases), [cases]);
+
+  // The bank chart shows the whole book so the filter has something to pick
+  // from; everything else narrows to the selection.
+  const scoped = useMemo(
+    () => (bank ? cases.filter((c) => c.bank === bank) : cases),
+    [cases, bank]
+  );
+
+  const byProperty = useMemo(() => buildPropertyMix(scoped), [scoped]);
+
+  const notices = useMemo(() => buildNoticeStage(scoped), [scoped]);
+  const demandTotal = notices.DEMAND;
+  const possessionTotal = notices.POSSESSION;
+
+  const bankShown = showAllBanks ? byBank : byBank.slice(0, TOP);
+
+  // Share of the scoped book, so the two cards read as a split of one
+  // population rather than two unrelated counts.
+  const share = (count) =>
+    scoped.length ? Math.round((count / scoped.length) * 100) : 0;
+
+  // Every figure in the strip has to describe the same population, or
+  // "Cases 22" sitting beside "Lenders 29" invites reading them together.
+  const scopedLenders = bank ? 1 : byBank.length;
+
+  const scopeLabel = bank ?? "all banks";
 
   return (
     <>
-      <div className="welcome-row">
-        <div>
-          <h2>Good morning, {firstName} 👋</h2>
-          <p>Here&apos;s what&apos;s happening with your case leads today.</p>
-        </div>
+      {/* One filter bar above the charts rather than inside a panel header:
+          the panels are half-width now, and a scope that governs the whole
+          page should not look like it belongs to the first chart. */}
+      <div className="dashboard-toolbar">
+        <BankFilter
+          banks={panel}
+          value={bank}
+          onChange={setBank}
+          total={cases.length}
+        />
 
-        <button type="button" className="date-button">
-          {formatLongDate(today)}
-        </button>
+        <dl className="scope-summary">
+          <div>
+            <dt>Cases</dt>
+            <dd>{scoped.length}</dd>
+          </div>
+          <div>
+            <dt>Lenders</dt>
+            <dd>
+              {scopedLenders}
+              <small>of {panel.length}</small>
+            </dd>
+          </div>
+        </dl>
       </div>
 
-      {searchQuery.trim() && (
-        <p className="search-summary" role="status">
-          {visibleCases.length} of {allCases.length} cases match &ldquo;
-          {searchQuery.trim()}&rdquo;
-        </p>
-      )}
-
-      <TodayFocus cases={visibleCases} />
-
-      <section className="stats-grid" aria-label="Case summary">
+      {/* The notice split is two numbers, not a distribution, so it reads as
+          a pair of cards rather than a chart. Both follow the bank filter. */}
+      <section className="stats-grid stats-grid-notices">
         <StatCard
-          title="Total Cases"
-          value={stats.totalCases}
-          description="All your cases"
-          icon={BriefcaseBusiness}
+          icon={FileText}
+          title="Demand notice"
+          value={demandTotal}
+          description={`${share(demandTotal)}% of cases for ${scopeLabel} · still inside the 60-day window`}
+          className="notice-card notice-demand"
         />
 
         <StatCard
-          title="Not Assigned"
-          value={stats.pendingAllocation}
-          description="No one assigned"
-          icon={Clock3}
-        />
-
-        <StatCard
-          title="Big Amount"
-          value={stats.highLiability}
-          description="Handle these first"
-          icon={AlertTriangle}
-        />
-
-        <StatCard
-          title="Due Soon"
-          value={stats.dueSoon}
-          description="Due within 7 days"
-          icon={CalendarClock}
-          className="warning-card"
-        />
-
-        <StatCard
-          title="Overdue"
-          value={stats.overdue}
-          description="Past the deadline"
-          icon={AlertTriangle}
-          className="danger-card"
-        />
-
-        <StatCard
-          title="Bank Visits"
-          value={stats.pendingVisits}
-          description="Still to visit"
-          icon={Building2}
-        />
-
-        <StatCard
-          title="Documents"
-          value={stats.pendingDocuments}
-          description="Papers to collect"
-          icon={FileWarning}
+          icon={Gavel}
+          title="Possession notice"
+          value={possessionTotal}
+          description={`${share(possessionTotal)}% of cases for ${scopeLabel} · moved on to possession`}
+          className="notice-card notice-possession"
         />
       </section>
 
       <section className="dashboard-two-column">
-        <BankCases cases={visibleCases} />
-        <TimelineCases cases={visibleCases} />
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>Cases by Bank</h2>
+              <p>Click a bar to filter the page</p>
+            </div>
+            <span className="count-chip">{byBank.length} lenders</span>
+          </div>
+
+          <div className="panel-chart">
+            <ChartShell
+              title="Case count per bank"
+              caption={
+                showAllBanks
+                  ? "Every lender with a live case"
+                  : `Top ${TOP} by case count`
+              }
+              columns={["Bank", "Cases"]}
+              rows={bankShown.map((b) => [b.label, String(b.value)])}
+            >
+              <BarChart
+                data={bankShown}
+                labelWidth={152}
+                selected={bank}
+                onSelect={setBank}
+              />
+            </ChartShell>
+
+            <MoreButton
+              shown={showAllBanks}
+              total={byBank.length}
+              cap={TOP}
+              noun="banks"
+              onToggle={() => setShowAllBanks((v) => !v)}
+            />
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>Cases by Property Type</h2>
+              <p>What secures each case, for {scopeLabel}</p>
+            </div>
+            <span className="count-chip">{scoped.length} cases</span>
+          </div>
+
+          <div className="panel-chart">
+            <ChartShell
+              title="Case count per property type"
+              caption="Longer bar = more cases of that type"
+              columns={["Property type", "Cases"]}
+              rows={byProperty.map((p) => [p.label, String(p.value)])}
+            >
+              <BarChart data={byProperty} labelWidth={140} />
+            </ChartShell>
+          </div>
+        </div>
       </section>
-
-      <SalesTeam cases={visibleCases} currentUserId={currentUserId} />
-
-      <CaseAnalytics cases={visibleCases} />
-
-      <HighLiabilityCases cases={visibleCases} />
-
-      <BankVisitCases cases={visibleCases} />
-
-      <section className="dashboard-two-column">
-        <Notifications
-          notifications={notificationItems}
-          unreadCount={unreadCount}
-          onMarkRead={onMarkNotificationRead}
-        />
-        <RecentActivities />
-      </section>
-
-      <PendingDocuments cases={visibleCases} />
-
     </>
   );
 }

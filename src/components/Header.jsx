@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Bell, ChevronDown, Menu, Search, X } from "lucide-react";
+import { ChevronDown, Menu, Search, X } from "lucide-react";
 
 import { initialsOf } from "../utils/cases";
 
@@ -10,7 +10,6 @@ export default function Header({
   onOpenSidebar,
   searchQuery = "",
   onSearchChange,
-  unreadCount = 0,
 }) {
   const searchRef = useRef(null);
 
@@ -70,19 +69,6 @@ export default function Header({
             <span aria-hidden="true">⌘ K</span>
           )}
         </div>
-
-        <button
-          type="button"
-          className="notification-button"
-          aria-label={
-            unreadCount
-              ? `Notifications, ${unreadCount} unread`
-              : "Notifications"
-          }
-        >
-          <Bell size={20} />
-          {unreadCount > 0 && <span />}
-        </button>
 
         <div className="header-profile">
           <div className="avatar" aria-hidden="true">
