@@ -6,19 +6,31 @@ import {
   useRef,
   useState,
 } from "react";
-import { Building2, Check, ChevronDown, Search, X } from "lucide-react";
+import { Check, ChevronDown, Search, X } from "lucide-react";
 
 const ALL = "__ALL__";
 
 /**
- * Bank picker: a text input you can type into, backed by a filtered list.
+ * Scope picker: a text input you can type into, backed by a filtered list.
  *
  * A native <select> cannot show placeholder text, and its first option would
  * have to double as the "no filter" state - which reads as a real choice. A
- * combobox gets a true placeholder and scales past the handful of banks in the
- * sample data without turning into a long scroll.
+ * combobox gets a true placeholder and scales past the handful of options in
+ * the sample data without turning into a long scroll.
+ *
+ * `noun` is the singular thing being picked ("bank", "city"). `allLabel` is
+ * the reset row, spelled out by the caller rather than pluralised here because
+ * English will not do that reliably.
  */
-export default function BankFilter({ banks = [], value, onChange, total = 0 }) {
+export default function ScopeFilter({
+  options: source = [],
+  value,
+  onChange,
+  total = 0,
+  noun = "option",
+  allLabel = "All",
+  icon: Icon,
+}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -29,7 +41,8 @@ export default function BankFilter({ banks = [], value, onChange, total = 0 }) {
   // be per-instance or aria-controls would point at the wrong list.
   const listId = useId();
 
-  const selectedLabel = value ?? "";
+  const selectedLabel =
+    source.find((option) => option.key === value)?.label ?? value ?? "";
 
   // The selection can change from outside this instance - a click on a chart
   // bar, or the twin of this control further down the page. Adopting it during
@@ -42,11 +55,11 @@ export default function BankFilter({ banks = [], value, onChange, total = 0 }) {
   }
 
   const options = useMemo(() => {
-    const all = [{ key: ALL, label: "All banks", count: total }];
-    const rest = banks.map((b) => ({
-      key: b.key,
-      label: b.label,
-      count: b.value,
+    const all = [{ key: ALL, label: allLabel, count: total }];
+    const rest = source.map((o) => ({
+      key: o.key,
+      label: o.label,
+      count: o.value,
     }));
 
     const term = query.trim().toLowerCase();
@@ -57,7 +70,7 @@ export default function BankFilter({ banks = [], value, onChange, total = 0 }) {
     return [...all, ...rest].filter((o) =>
       o.label.toLowerCase().includes(term)
     );
-  }, [banks, query, selectedLabel, total]);
+  }, [allLabel, source, query, selectedLabel, total]);
 
   // Leaving the field abandons any half-typed text and shows the live
   // selection again, so the input never disagrees with what is filtered.
@@ -114,21 +127,23 @@ export default function BankFilter({ banks = [], value, onChange, total = 0 }) {
   }
 
   return (
-    <div className="bank-filter" ref={rootRef}>
-      <div className={`bank-filter-control ${open ? "is-open" : ""}`}>
-        <Building2 size={16} aria-hidden="true" className="bank-filter-icon" />
+    <div className="scope-filter" ref={rootRef}>
+      <div className={`scope-filter-control ${open ? "is-open" : ""}`}>
+        {Icon && (
+          <Icon size={16} aria-hidden="true" className="scope-filter-icon" />
+        )}
 
         <input
           ref={inputRef}
           type="text"
-          className="bank-filter-input"
-          placeholder="Bank name..."
+          className="scope-filter-input"
+          placeholder={`${noun} name...`}
           value={query}
           role="combobox"
           aria-expanded={open}
           aria-controls={listId}
           aria-autocomplete="list"
-          aria-label="Filter by bank name"
+          aria-label={`Filter by ${noun} name`}
           onChange={(e) => {
             setQuery(e.target.value);
             setActiveIndex(0);
@@ -144,8 +159,8 @@ export default function BankFilter({ banks = [], value, onChange, total = 0 }) {
         {value ? (
           <button
             type="button"
-            className="bank-filter-clear"
-            aria-label="Clear bank filter"
+            className="scope-filter-clear"
+            aria-label={`Clear ${noun} filter`}
             onClick={() => {
               onChange?.(null);
               setQuery("");
@@ -158,18 +173,18 @@ export default function BankFilter({ banks = [], value, onChange, total = 0 }) {
           <ChevronDown
             size={16}
             aria-hidden="true"
-            className="bank-filter-caret"
+            className="scope-filter-caret"
             style={{ transform: open ? "rotate(180deg)" : "none" }}
           />
         )}
       </div>
 
       {open && (
-        <ul className="bank-filter-list" id={listId} role="listbox">
+        <ul className="scope-filter-list" id={listId} role="listbox">
           {options.length === 0 ? (
-            <li className="bank-filter-empty">
+            <li className="scope-filter-empty">
               <Search size={14} aria-hidden="true" />
-              No bank matches that
+              No {noun} matches that
             </li>
           ) : (
             options.map((option, i) => {
@@ -182,19 +197,19 @@ export default function BankFilter({ banks = [], value, onChange, total = 0 }) {
                     type="button"
                     role="option"
                     aria-selected={isSelected}
-                    className={`bank-filter-option ${
+                    className={`scope-filter-option ${
                       i === activeIndex ? "is-active" : ""
                     } ${isSelected ? "is-selected" : ""}`}
                     onMouseEnter={() => setActiveIndex(i)}
                     onClick={() => pick(option)}
                   >
-                    <span className="bank-filter-check" aria-hidden="true">
+                    <span className="scope-filter-check" aria-hidden="true">
                       {isSelected && <Check size={14} />}
                     </span>
 
-                    <span className="bank-filter-name">{option.label}</span>
+                    <span className="scope-filter-name">{option.label}</span>
                     <span
-                      className={`bank-filter-count ${
+                      className={`scope-filter-count ${
                         option.count === 0 ? "is-zero" : ""
                       }`}
                     >

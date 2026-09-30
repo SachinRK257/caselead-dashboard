@@ -462,141 +462,113 @@ button {
 
 /* =============================================================== STATS === */
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 14px;
-  margin-bottom: 20px;
-}
-
+/* Flat cards: a label, the figure, the caveat. No icon and no accent rail -
+   with two cards on the page, chrome that big competes with the number it is
+   supposed to introduce. The stage colour rides on the value instead. */
 .stat-card {
   position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: 16px;
-  min-height: 138px;
+  padding: 20px 22px;
   box-shadow: var(--shadow-sm);
-  overflow: hidden;
-  transition: box-shadow 0.18s ease, transform 0.18s ease;
+  transition: box-shadow 0.18s ease;
 }
 
 .stat-card:hover {
   box-shadow: var(--shadow);
-  transform: translateY(-2px);
 }
 
-/* A thin accent rail reads faster than a coloured icon alone. */
-.stat-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: var(--brand);
-  opacity: 0;
-  transition: opacity 0.18s ease;
-}
-
-.stat-card:hover::before {
-  opacity: 1;
-}
-
-.stat-card.warning-card::before {
-  background: #d97706;
-  opacity: 1;
-}
-
-.stat-card.danger-card::before {
-  background: #dc2626;
-  opacity: 1;
-}
-
-.stat-top {
-  display: flex;
-  justify-content: space-between;
-}
-
-.stat-icon {
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-md);
-  background: var(--brand-soft);
-  color: var(--brand);
-}
-
-.stat-card.warning-card .stat-icon {
-  background: #fffbeb;
-  color: #d97706;
-}
-
-.stat-card.danger-card .stat-icon {
-  background: var(--danger-soft);
-  color: #dc2626;
-}
-
-/* Only two cards in the strip, so they share the row evenly instead of
-   sitting in the seven-column grid the page-level stats used. */
-.stats-grid-notices {
-  grid-template-columns: 1fr 1fr;
-}
-
-/* Notice-stage accents echo NOTICE_COLORS in chartTokens.js, so the stages
-   keep one colour wherever they appear. The rail is always on: with two cards
-   side by side, a hover-only rail would make them look identical. */
-.stat-card.notice-card::before {
-  opacity: 1;
-}
-
-.stat-card.notice-demand::before {
-  background: #eda100;
-}
-
-.stat-card.notice-demand .stat-icon {
-  background: #fffbeb;
-  color: #d97706;
-}
-
-.stat-card.notice-possession::before {
-  background: #4a3aa7;
-}
-
-.stat-card.notice-possession .stat-icon {
-  background: #eeebf8;
-  color: #4a3aa7;
+.stat-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 
 .stat-value {
-  margin-top: 14px;
-  font-size: 28px;
+  margin-top: 10px;
+  font-size: 32px;
   line-height: 1;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--text);
-}
-
-.stat-title {
-  margin-top: 9px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-description {
-  margin-top: 3px;
-  color: var(--text-faint);
-  font-size: 11px;
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Notice-stage colours. These are the text-safe steps of the same hues as
+   NOTICE_COLORS in chartTokens.js: the chart fills there are chosen against a
+   3:1 mark gate, which is too light to set 32px type on white. */
+.stat-card.notice-demand .stat-value {
+  color: #b45309;
+}
+
+.stat-card.notice-possession .stat-value {
+  color: #4a3aa7;
 }
 
 /* ============================================================== PANELS === */
 
-.dashboard-two-column {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: stretch;
-  gap: 18px;
+.notice-strip {
   margin-bottom: 18px;
+}
+
+/* The heading names what the filter beside it scopes, so the pair below is
+   never read as covering the whole book when it does not. */
+.notice-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  margin-bottom: 14px;
+}
+
+.notice-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.notice-head p {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* The two filters travel together and wrap as a unit, so a narrow header
+   never leaves one stranded on a line of its own. */
+.notice-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.notice-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+
+/* The caseload card is the population the other three split up, so it leads
+   and keeps the default ink - the accents mark the stages within it. */
+.notice-caseload .stat-value {
+  color: var(--text);
+}
+
+.dashboard-charts {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
 }
 
 .panel {
@@ -861,6 +833,40 @@ button {
   color: var(--danger);
 }
 
+/* Pipeline stages. The pairs below are the theme's own soft/ink accents, so
+   every badge clears 4.5:1 on its own fill. Not Contacted and Not Allotted are
+   the two that need chasing, so they take the warning and danger families;
+   everything else reads as progress. */
+.status-badge.not_contacted {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.status-badge.contacted {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+}
+
+.status-badge.following_up {
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+
+.status-badge.allotted {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.status-badge.not_allotted {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.status-badge.account_upgraded {
+  background: #f0fdfa;
+  color: #0f766e;
+}
+
 .status-dot {
   width: 6px;
   height: 6px;
@@ -878,12 +884,12 @@ button {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1000px;
+  min-width: 1120px;
 }
 
 .data-table th {
   height: 44px;
-  padding: 0 16px;
+  padding: 0 12px;
   background: var(--surface-muted);
   border-bottom: 1px solid var(--border-soft);
   color: var(--text-muted);
@@ -896,7 +902,7 @@ button {
 }
 
 .data-table td {
-  padding: 13px 16px;
+  padding: 13px 12px;
   border-top: 1px solid var(--border-soft);
   color: var(--text-secondary);
   font-size: 13px;
@@ -912,8 +918,30 @@ button {
 }
 
 .case-id {
+  padding: 13px 12px;
+  border-top: 1px solid var(--border-soft);
+  text-align: left;
   color: var(--brand);
+  font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.cell-muted {
+  color: var(--text-faint);
+}
+
+.assignee-hint {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.table-empty {
+  margin: 0;
+  padding: 28px 18px 32px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
 }
 
 .liability-amount {
@@ -1349,6 +1377,10 @@ button {
 
 
 
+.full-panel > .chart-more {
+  margin: 14px 18px 18px;
+}
+
 .chart-more {
   margin: 4px 0 6px;
   align-self: flex-start;
@@ -1362,7 +1394,7 @@ button {
   flex-direction: column;
 }
 
-.bank-filter-count.is-zero {
+.scope-filter-count.is-zero {
   opacity: 0.5;
 }
 
@@ -1381,6 +1413,39 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-sm);
+}
+
+.scope-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.scope-note strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.scope-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.scope-clear:hover {
+  background: var(--surface-muted);
+  color: var(--text);
 }
 
 .scope-summary {
@@ -1416,27 +1481,25 @@ button {
   font-weight: 500;
 }
 
-/* Side-by-side panels should end level even when one chart is shorter. */
-.dashboard-two-column > .panel {
-  height: 100%;
+.dashboard-charts > .panel {
   display: flex;
   flex-direction: column;
 }
 
-.dashboard-two-column .panel-chart {
+.dashboard-charts .panel-chart {
   flex: 1;
   display: flex;
   flex-direction: column;
 }
 
-/* ========================================================= BANK FILTER === */
+/* ======================================================== SCOPE FILTER === */
 
-.bank-filter {
+.scope-filter {
   position: relative;
   min-width: 250px;
 }
 
-.bank-filter-control {
+.scope-filter-control {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -1448,25 +1511,25 @@ button {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.bank-filter-control:hover {
+.scope-filter-control:hover {
   border-color: #cbd5e1;
 }
 
-.bank-filter-control.is-open {
+.scope-filter-control.is-open {
   border-color: var(--brand);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
-.bank-filter-icon {
+.scope-filter-icon {
   color: var(--text-faint);
   flex-shrink: 0;
 }
 
-.bank-filter-control.is-open .bank-filter-icon {
+.scope-filter-control.is-open .scope-filter-icon {
   color: var(--brand);
 }
 
-.bank-filter-input {
+.scope-filter-input {
   flex: 1;
   min-width: 0;
   border: 0;
@@ -1477,18 +1540,18 @@ button {
   color: var(--text);
 }
 
-.bank-filter-input::placeholder {
+.scope-filter-input::placeholder {
   color: var(--text-faint);
   font-weight: 400;
 }
 
-.bank-filter-caret {
+.scope-filter-caret {
   color: var(--text-faint);
   flex-shrink: 0;
   transition: transform 0.18s ease;
 }
 
-.bank-filter-clear {
+.scope-filter-clear {
   display: grid;
   place-items: center;
   width: 22px;
@@ -1500,12 +1563,12 @@ button {
   color: var(--text-muted);
 }
 
-.bank-filter-clear:hover {
+.scope-filter-clear:hover {
   background: var(--danger-soft);
   color: var(--danger);
 }
 
-.bank-filter-list {
+.scope-filter-list {
   position: absolute;
   z-index: 40;
   top: calc(100% + 6px);
@@ -1522,7 +1585,7 @@ button {
   box-shadow: var(--shadow-lg);
 }
 
-.bank-filter-option {
+.scope-filter-option {
   width: 100%;
   display: flex;
   align-items: center;
@@ -1538,17 +1601,17 @@ button {
 
 /* Hover and keyboard share one highlight, so there is never a second
    "where am I" marker competing with the first. */
-.bank-filter-option.is-active {
+.scope-filter-option.is-active {
   background: var(--brand-soft);
   color: var(--brand-dark);
 }
 
-.bank-filter-option.is-selected {
+.scope-filter-option.is-selected {
   font-weight: 600;
   color: var(--text);
 }
 
-.bank-filter-check {
+.scope-filter-check {
   display: grid;
   place-items: center;
   width: 16px;
@@ -1556,7 +1619,7 @@ button {
   color: var(--brand);
 }
 
-.bank-filter-name {
+.scope-filter-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1564,7 +1627,7 @@ button {
   white-space: nowrap;
 }
 
-.bank-filter-count {
+.scope-filter-count {
   flex-shrink: 0;
   padding: 2px 8px;
   border-radius: var(--r-pill);
@@ -1575,11 +1638,11 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-.bank-filter-option.is-active .bank-filter-count {
+.scope-filter-option.is-active .scope-filter-count {
   background: rgba(255, 255, 255, 0.75);
 }
 
-.bank-filter-empty {
+.scope-filter-empty {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -2196,13 +2259,13 @@ button {
 .bar-row {
   display: grid;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
   border: 0;
   background: transparent;
   color: inherit;
   text-align: left;
-  padding: 5px 0;
+  padding: 7px 0;
   border-radius: var(--r-sm);
 }
 
@@ -2210,8 +2273,11 @@ button {
   background: var(--surface-muted);
 }
 
+/* Right-aligned, so every label ends against the shared baseline the bars
+   start from and the eye has one edge to travel down. */
 .bar-label {
   font-size: 12px;
+  text-align: right;
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2221,13 +2287,25 @@ button {
 .bar-track {
   display: block;
   width: 100%;
-  height: 18px; /* capped well under the 24px mark ceiling */
+  height: 22px; /* capped under the 24px mark ceiling */
   position: relative;
+}
+
+/* A dashed rule per row carries the eye from a short bar across to nothing,
+   which is the reading a gap alone makes hard. */
+.bar-track::before {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto 0;
+  border-top: 1px dashed var(--border);
 }
 
 .bar-fill {
   position: absolute;
   inset: 0 auto 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   /* Square at the baseline, 4px rounded at the data end. */
   border-radius: 0 4px 4px 0;
   min-width: 2px;
@@ -2239,6 +2317,21 @@ button {
   font-weight: 700;
   color: var(--text);
   white-space: nowrap;
+}
+
+/* Inside the fill while the bar is long enough to hold it; past the tip when
+   it is not. Either way the value sits with its own bar rather than in a
+   column the eye has to track across to. */
+.bar-value.is-inside {
+  padding-right: 9px;
+  color: #ffffff;
+}
+
+.bar-value.is-outside {
+  position: absolute;
+  top: 50%;
+  margin-left: 9px;
+  transform: translateY(-50%);
 }
 
 /* --- area chart --- */
@@ -2404,12 +2497,6 @@ button {
 
 /* ========================================================== RESPONSIVE === */
 
-@media (max-width: 1450px) {
-  .stats-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
 @media (max-width: 1100px) {
   .sidebar {
     position: fixed;
@@ -2456,9 +2543,6 @@ button {
     align-items: center;
   }
 
-  .dashboard-two-column {
-    grid-template-columns: 1fr;
-  }
 
   .dashboard-toolbar {
     align-items: stretch;
@@ -2468,14 +2552,10 @@ button {
   .chart-grid {
     grid-template-columns: 1fr;
   }
+}
 
-  .stats-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  /* Two cards still fit side by side here; the three-column rule above is
-     for the wider stat strips. */
-  .stats-grid-notices {
+@media (max-width: 1250px) {
+  .notice-cards {
     grid-template-columns: 1fr 1fr;
   }
 }
@@ -2516,10 +2596,6 @@ button {
     padding: 20px 16px;
   }
 
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
   .welcome-row {
     align-items: flex-start;
     flex-direction: column;
@@ -2539,7 +2615,11 @@ button {
     flex-direction: column;
   }
 
-  .bank-filter {
+  .scope-filter {
+    width: 100%;
+  }
+
+  .notice-filters {
     width: 100%;
   }
 
@@ -2581,22 +2661,16 @@ button {
 }
 
 @media (max-width: 460px) {
-  .stats-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-
-  .stats-grid-notices {
+  .notice-cards {
     grid-template-columns: 1fr;
   }
 
   .stat-card {
-    padding: 14px;
-    min-height: 120px;
+    padding: 16px 18px;
   }
 
   .stat-value {
-    font-size: 23px;
+    font-size: 27px;
   }
 
   .timeline-summary {

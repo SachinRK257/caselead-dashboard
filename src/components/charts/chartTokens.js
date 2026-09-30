@@ -26,12 +26,16 @@ export const CHART = {
   inkMuted: "#94a3b8",
 
   /* Single-series marks: one hue for every bar, never a ramp across nominal
-     categories (banks and property types have no natural order). */
-  series: "#2563eb",
-  seriesWash: "rgba(37, 99, 235, 0.1)",
+     categories (banks and property types have no natural order).
+
+     4.68:1 against the panel surface, so it clears the 3:1 mark gate on its
+     own, and white sits on it at the same 4.68:1 - which is what lets the bar
+     carry its value inside the fill rather than out past the tip. */
+  series: "#6b63e0",
+  seriesWash: "rgba(107, 99, 224, 0.1)",
 
   /* Meter track: a lighter step of the fill's own ramp. */
-  trackSoft: "#dbeafe",
+  trackSoft: "#e0def9",
 };
 
 export const TIMELINE_COLORS = {

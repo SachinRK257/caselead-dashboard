@@ -1,4 +1,9 @@
-import { daysUntil, getTimelineStatus, isEmptyValue } from "./format";
+import {
+  daysUntil,
+  getTimelineStatus,
+  humanizeEnum,
+  isEmptyValue,
+} from "./format";
 import { banks, salespeople } from "../data/mockData";
 
 /** Liability at or above this is treated as a priority case. */
@@ -23,6 +28,23 @@ export const VISIT_STATUS_LABELS = {
   VISIT_COMPLETED: "Visit Completed",
   VISIT_RESCHEDULED: "Visit Rescheduled",
   VISIT_CANCELLED: "Visit Cancelled",
+};
+
+/**
+ * Where a case has reached in the follow-up pipeline, in pipeline order.
+ *
+ * The order is the sequence itself, not a ranking by size, so the filter and
+ * any breakdown read as a funnel. `humanizeEnum` already renders every key
+ * the way it is spoken ("FOLLOWING_UP" -> "Following Up"), so there is no
+ * label map to drift out of sync with this list.
+ */
+export const CASE_STATUS = {
+  NOT_CONTACTED: "NOT_CONTACTED",
+  CONTACTED: "CONTACTED",
+  FOLLOWING_UP: "FOLLOWING_UP",
+  ALLOTTED: "ALLOTTED",
+  NOT_ALLOTTED: "NOT_ALLOTTED",
+  ACCOUNT_UPGRADED: "ACCOUNT_UPGRADED",
 };
 
 export const DOCUMENT_STATUS = {
@@ -194,6 +216,10 @@ export function buildDocumentMix(cases) {
   return countByKey(cases, "documents", Object.keys(DOCUMENT_STATUS));
 }
 
+export function buildAllocationMix(cases) {
+  return countByKey(cases, "allocationStatus", Object.keys(ALLOCATION_STATUS));
+}
+
 /** Case count per bank, busiest first. */
 export function buildBankCounts(cases) {
   const counts = new Map();
@@ -291,6 +317,40 @@ export function buildIntakeByMonth(cases) {
   }
 
   return series;
+}
+
+/**
+ * Every city the team covers with its case count, zeros included.
+ *
+ * Seeded from the salespeople rather than from the cases, so a patch can
+ * always be looked up - a month with no live case in Mysuru is itself the
+ * answer someone is after, and a list built from the cases would hide it.
+ */
+export function buildCityPanel(cases) {
+  const counts = new Map(salespeople.map((person) => [person.city, 0]));
+  for (const item of cases) {
+    counts.set(item.city, (counts.get(item.city) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([label, value]) => ({ key: label, label, value }))
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
+}
+
+/**
+ * Every pipeline stage with its case count, zeros included and in pipeline
+ * order - unlike the bank and city panels, which sort by size. A stage with
+ * no cases is a real answer here, and reordering the funnel by count would
+ * destroy the only thing the sequence has to say.
+ */
+export function buildStatusPanel(cases) {
+  const counts = countByKey(cases, "caseStatus", Object.keys(CASE_STATUS));
+
+  return Object.entries(counts).map(([key, value]) => ({
+    key,
+    label: humanizeEnum(key),
+    value,
+  }));
 }
 
 /** Case count per city, largest first. */

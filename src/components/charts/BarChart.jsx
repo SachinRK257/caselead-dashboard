@@ -12,6 +12,13 @@ import { useHover } from "./useHover";
  * Each bar carries its value at the tip, which keeps the chart readable without
  * hover and satisfies the relief rule for the lighter fills.
  */
+
+/**
+ * Below this share of the track the bar is too short to hold its own label,
+ * so the value moves out past the tip instead of overflowing the fill.
+ */
+const INSIDE_LABEL_MIN_SHARE = 16;
+
 export default function BarChart({
   data = [],
   color = CHART.series,
@@ -32,12 +39,15 @@ export default function BarChart({
     <div className="bar-chart">
       {data.map((item, i) => {
         const share = max > 0 ? (item.value / max) * 100 : 0;
+        const insideLabel = share >= INSIDE_LABEL_MIN_SHARE;
 
         const key = item.key ?? item.label;
         const isSelected = selected === key;
         // Dim the rest only when something is picked, so the selection reads
         // as the subject and the others as context.
         const dimmed = selected != null && !isSelected;
+
+        const value = formatValue(item.value);
 
         return (
           <button
@@ -46,8 +56,8 @@ export default function BarChart({
             className={`bar-row ${onSelect ? "is-clickable" : ""} ${
               isSelected ? "is-selected" : ""
             }`}
-            style={{ gridTemplateColumns: `${labelWidth}px 1fr auto` }}
-            aria-label={`${item.label}: ${formatValue(item.value)}`}
+            style={{ gridTemplateColumns: `${labelWidth}px 1fr` }}
+            aria-label={`${item.label}: ${value}`}
             aria-pressed={onSelect ? isSelected : undefined}
             onClick={onSelect ? () => onSelect(isSelected ? null : key) : undefined}
             onMouseEnter={(e) => show(i, e)}
@@ -65,10 +75,21 @@ export default function BarChart({
                   background: color,
                   opacity: dimmed || (hover && hover.index !== i) ? 0.55 : 1,
                 }}
-              />
-            </span>
+              >
+                {insideLabel && (
+                  <strong className="bar-value is-inside">{value}</strong>
+                )}
+              </span>
 
-            <strong className="bar-value">{formatValue(item.value)}</strong>
+              {!insideLabel && (
+                <strong
+                  className="bar-value is-outside"
+                  style={{ left: `${share}%` }}
+                >
+                  {value}
+                </strong>
+              )}
+            </span>
           </button>
         );
       })}
