@@ -1,20 +1,33 @@
 import { useMemo, useState } from "react";
 import { Building2, CircleDot, MapPin, X } from "lucide-react";
 
-import CaseTable from "../components/CaseTable";
+import AgeingCases from "../components/AgeingCases";
+import LenderPanel from "../components/LenderPanel";
+import TopLiabilityCases from "../components/TopLiabilityCases";
 import ScopeFilter from "../components/ScopeFilter";
 import StatCard from "../components/StatCard";
 import BarChart from "../components/charts/BarChart";
+import LineChart from "../components/charts/LineChart";
 import { ChartShell } from "../components/charts/ChartShell";
+import { humanizeEnum } from "../utils/format";
+import { NOTICE_SERIES_COLORS } from "../components/charts/chartTokens";
 import {
-  buildAllocationMix,
+  ACTIVE_CASE_STATUSES,
+  buildAgeingCases,
   buildBankCounts,
   buildCityPanel,
   buildNoticeStage,
   buildPanelCounts,
   buildPropertyMix,
+  buildNoticeSeries,
+  NOTICE_BUCKET,
   buildStatusPanel,
+  buildTopLiability,
+  buildLenderPanel,
+  EMPANELMENT,
+  EMPANELMENT_STATE,
   getOwnerForCity,
+  summariseLenderPanel,
 } from "../utils/cases";
 
 /** Show-all control for a capped chart. Rendered only when there is a tail. */
@@ -38,11 +51,52 @@ function percent(count, total) {
 // 32 lenders is too long a chart to scan; the rest are one click away.
 const TOP = 5;
 
+/* Enough to be a morning's worth of chasing; a longer list stops being a
+   worklist and starts being the case register, which has its own page. */
+const AGEING_ROWS = 10;
+
+const LIABILITY_ROWS = 10;
+
 // The table is a lookup, not a reading list; ten rows is enough to recognise
 // what a filter caught before deciding to open the rest.
-const CASE_ROWS = 10;
+/* The five stages the dashboard reports. Every case carries exactly one, so
+   these are counts of one population rather than overlapping tallies. */
+const STATUS_CARDS = [
+  { key: "ALLOTTED", label: "Allocated" },
+  { key: "CONTACTED", label: "Contacted" },
+  { key: "NOT_ALLOTTED", label: "Not allotted" },
+  { key: "FOLLOWING_UP", label: "Follow-up" },
+  { key: "ACCOUNT_UPGRADED", label: "Account upgraded" },
+];
 
-export default function Dashboard({ cases = [] }) {
+/* Weekly by default: this book serves nought to six notices on any given day,
+   so the daily line is a row of spikes between zeros - true, but shapeless.
+   Daily is still there for the raw grain. */
+const BUCKETS = [
+  { key: "DAY", label: "Daily", unit: "day", window: "the last 30 days" },
+  { key: "WEEK", label: "Weekly", unit: "week", window: "the last 12 weeks" },
+  {
+    key: "MONTH",
+    label: "Monthly",
+    unit: "month",
+    window: "every month on record",
+  },
+];
+
+/* Total last, so it draws over the two it is made of rather than under them
+   - it is the sum, so it sits highest on every point and would otherwise be
+   the line hidden by its own parts. */
+const NOTICE_LINES = [
+  { key: "DEMAND", label: "Demand notice", color: NOTICE_SERIES_COLORS.DEMAND },
+  {
+    key: "POSSESSION",
+    label: "Possession notice",
+    color: NOTICE_SERIES_COLORS.POSSESSION,
+  },
+  { key: "TOTAL", label: "Total notices", color: NOTICE_SERIES_COLORS.TOTAL },
+];
+
+export default function Dashboard({ cases = [], today }) {
   const [bank, setBank] = useState(null);
   const [showAllBanks, setShowAllBanks] = useState(false);
 
@@ -53,12 +107,61 @@ export default function Dashboard({ cases = [] }) {
   const [noticeBank, setNoticeBank] = useState(null);
   const [noticeCity, setNoticeCity] = useState(null);
   const [noticeStatus, setNoticeStatus] = useState(null);
-  const [showAllCases, setShowAllCases] = useState(false);
+
+  const hasFilters = Boolean(noticeBank || noticeCity || noticeStatus);
+
+  function clearFilters() {
+    setNoticeBank(null);
+    setNoticeCity(null);
+    setNoticeStatus(null);
+  }
+  const [empanelment, setEmpanelment] = useState(EMPANELMENT.ALL);
+  const [bucket, setBucket] = useState(NOTICE_BUCKET.WEEK);
 
   const byBank = useMemo(() => buildBankCounts(cases), [cases]);
   const panel = useMemo(() => buildPanelCounts(cases), [cases]);
   const cityPanel = useMemo(() => buildCityPanel(cases), [cases]);
   const statusPanel = useMemo(() => buildStatusPanel(cases), [cases]);
+
+  const noticeSeries = useMemo(
+    () => buildNoticeSeries(cases, bucket),
+    [cases, bucket]
+  );
+
+  const bucketMeta = BUCKETS.find((b) => b.key === bucket) ?? BUCKETS[1];
+
+  const seriesTotals = useMemo(
+    () =>
+      noticeSeries.reduce(
+        (sum, point) => ({
+          DEMAND: sum.DEMAND + point.values.DEMAND,
+          POSSESSION: sum.POSSESSION + point.values.POSSESSION,
+          TOTAL: sum.TOTAL + point.values.TOTAL,
+        }),
+        { DEMAND: 0, POSSESSION: 0, TOTAL: 0 }
+      ),
+    [noticeSeries]
+  );
+
+  // The lender panel is the whole book, not the filtered scope: it answers who
+  // we are cleared to work with, which does not move with a case filter.
+  const lenders = useMemo(() => buildLenderPanel(cases), [cases]);
+  const lenderSummary = useMemo(() => summariseLenderPanel(lenders), [lenders]);
+  const lenderRows = useMemo(() => {
+    // "Active" holds the ones expiring soon too - they are still live cover,
+    // and hiding them here would make the count disagree with the segment.
+    if (empanelment === EMPANELMENT.ACTIVE)
+      return lenders.filter(
+        (l) =>
+          l.state === EMPANELMENT_STATE.ACTIVE ||
+          l.state === EMPANELMENT_STATE.EXPIRING
+      );
+    if (empanelment === EMPANELMENT.EXPIRED)
+      return lenders.filter((l) => l.state === EMPANELMENT_STATE.EXPIRED);
+    if (empanelment === EMPANELMENT.NO_LETTER)
+      return lenders.filter((l) => l.state === EMPANELMENT_STATE.NONE);
+    return lenders;
+  }, [lenders, empanelment]);
 
   // The bank chart shows the whole book so the filter has something to pick
   // from; the property chart narrows to the selection.
@@ -69,18 +172,54 @@ export default function Dashboard({ cases = [] }) {
 
   const byProperty = useMemo(() => buildPropertyMix(scoped), [scoped]);
 
-  const noticeScope = useMemo(
+  // Lender and city only. The status cards are the breakdown the status
+  // filter picks from, so narrowing by status here would leave four of the
+  // five reading zero the moment anyone used it.
+  const placeScope = useMemo(
     () =>
       cases.filter(
         (c) =>
           (!noticeBank || c.bank === noticeBank) &&
-          (!noticeCity || c.city === noticeCity) &&
-          (!noticeStatus || c.caseStatus === noticeStatus)
+          (!noticeCity || c.city === noticeCity)
       ),
-    [cases, noticeBank, noticeCity, noticeStatus]
+    [cases, noticeBank, noticeCity]
   );
+
+  const noticeScope = useMemo(
+    () =>
+      noticeStatus
+        ? placeScope.filter((c) => c.caseStatus === noticeStatus)
+        : placeScope,
+    [placeScope, noticeStatus]
+  );
+
   const notices = useMemo(() => buildNoticeStage(noticeScope), [noticeScope]);
-  const allocation = useMemo(() => buildAllocationMix(noticeScope), [noticeScope]);
+
+  const ageing = useMemo(
+    () => buildAgeingCases(placeScope, today, AGEING_ROWS),
+    [placeScope, today]
+  );
+
+  const topLiability = useMemo(
+    () => buildTopLiability(placeScope, LIABILITY_ROWS),
+    [placeScope]
+  );
+
+  // This book has 26 distinct amounts across 188 cases, so the cut-off almost
+  // always lands inside a tie. Saying how many equally large cases the list
+  // leaves out is cheaper than letting someone assume there were none.
+  const tiedBelowCut = useMemo(() => {
+    const cutoff = topLiability[topLiability.length - 1]?.liability;
+    if (cutoff === undefined || placeScope.length <= LIABILITY_ROWS) return 0;
+
+    const shown = topLiability.filter((c) => c.liability === cutoff).length;
+    return placeScope.filter((c) => c.liability === cutoff).length - shown;
+  }, [placeScope, topLiability]);
+
+  const statusCounts = useMemo(() => {
+    const counts = buildStatusPanel(placeScope);
+    return Object.fromEntries(counts.map((row) => [row.key, row.value]));
+  }, [placeScope]);
 
   const bankShown = showAllBanks ? byBank : byBank.slice(0, TOP);
 
@@ -97,19 +236,19 @@ export default function Dashboard({ cases = [] }) {
   const statusLabel =
     statusPanel.find((option) => option.key === noticeStatus)?.label ?? null;
 
-  const noticeLabel = [
-    [noticeBank, noticeCity].filter(Boolean).join(" in ") ||
-      "all banks and cities",
-    statusLabel,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // "not contacted, contacted or following up", built from the same list the
+  // query uses so the heading cannot drift from what is actually shown.
+  const activeStageLabel = ACTIVE_CASE_STATUSES.map((key) =>
+    humanizeEnum(key).toLowerCase()
+  )
+    .join(", ")
+    .replace(/, ([^,]*)$/, " or $1");
 
-  // The table is the only place the whole book would be listed, so it opens
-  // capped; the count in the header says what is being held back.
-  const caseRows = showAllCases
-    ? noticeScope
-    : noticeScope.slice(0, CASE_ROWS);
+  const placeLabel =
+    [noticeBank, noticeCity].filter(Boolean).join(" in ") ||
+    "all banks and cities";
+
+  const noticeLabel = [placeLabel, statusLabel].filter(Boolean).join(" · ");
 
   return (
     <>
@@ -184,6 +323,17 @@ export default function Dashboard({ cases = [] }) {
               allLabel="All"
               icon={CircleDot}
             />
+
+            {hasFilters && (
+              <button
+                type="button"
+                className="scope-clear filters-clear"
+                onClick={clearFilters}
+              >
+                <X size={13} aria-hidden="true" />
+                Clear all
+              </button>
+            )}
           </div>
         </div>
 
@@ -194,7 +344,7 @@ export default function Dashboard({ cases = [] }) {
             description={
               cityOwner
                 ? `${cityOwner.name} covers ${noticeCity} · ${cityOwner.region}`
-                : `across all ${cityPanel.length} cities the team covers`
+                : noticeLabel
             }
             className="notice-card notice-caseload"
           />
@@ -217,42 +367,71 @@ export default function Dashboard({ cases = [] }) {
             )}% of ${noticeScope.length} cases · moved on to possession`}
             className="notice-card notice-possession"
           />
+        </div>
+      </section>
 
-          {/* Left in the default ink: the two stages are a matched pair and
-              wear the colour, so a third accent here would imply allocation
-              belongs to the same sequence. */}
-          <StatCard
-            title="Allocated cases"
-            value={allocation.ALLOCATED}
-            description={`${percent(
-              allocation.ALLOCATED,
-              noticeScope.length
-            )}% of ${noticeScope.length} cases · ${
-              allocation.NOT_ALLOCATED
-            } still waiting on an owner`}
-            className="notice-card"
-          />
+      {/* Counts, not cases: the case list itself lives on the Case Lead page,
+          and this is the dashboard's summary of it. */}
+      <section className="notice-strip" aria-labelledby="status-heading">
+        <div className="notice-head">
+          <div>
+            <h2 id="status-heading">Case Status</h2>
+            <p>
+              Where the {placeScope.length} cases for {placeLabel} stand
+            </p>
+          </div>
+        </div>
+
+        <div className="status-cards">
+          {STATUS_CARDS.map((card) => (
+            <StatCard
+              key={card.key}
+              title={card.label}
+              value={statusCounts[card.key] ?? 0}
+              description={`${percent(
+                statusCounts[card.key] ?? 0,
+                placeScope.length
+              )}% of ${placeScope.length} cases`}
+              className={`notice-card ${
+                noticeStatus === card.key ? "is-picked" : ""
+              }`}
+            />
+          ))}
         </div>
       </section>
 
       <div className="panel full-panel">
         <div className="panel-header">
           <div>
-            <h2>Matching Cases</h2>
-            <p>Every case in the filters above, for {noticeLabel}</p>
+            <h2>Longest Open Cases</h2>
+            <p>
+              Still {activeStageLabel} — oldest first, counted from the demand
+              notice, for {placeLabel}
+            </p>
           </div>
-          <span className="count-chip">{noticeScope.length} cases</span>
+          <span className="count-chip">top {AGEING_ROWS}</span>
         </div>
 
-        <CaseTable cases={caseRows} />
+        <AgeingCases cases={ageing} />
+      </div>
 
-        <MoreButton
-          shown={showAllCases}
-          total={noticeScope.length}
-          cap={CASE_ROWS}
-          noun="cases"
-          onToggle={() => setShowAllCases((v) => !v)}
-        />
+      <div className="panel full-panel">
+        <div className="panel-header">
+          <div>
+            <h2>Highest Liability Cases</h2>
+            <p>
+              Largest amounts outstanding and how far each has been taken, for{" "}
+              {placeLabel}
+              {tiedBelowCut > 0 &&
+                ` — ${tiedBelowCut} more case${
+                  tiedBelowCut === 1 ? "" : "s"
+                } at the same amount not shown`}
+            </p>
+          </div>
+          <span className="count-chip">top {LIABILITY_ROWS}</span>
+        </div>
+
+        <TopLiabilityCases cases={topLiability} />
       </div>
 
       <section className="dashboard-charts">
@@ -315,6 +494,52 @@ export default function Dashboard({ cases = [] }) {
           </div>
         </div>
       </section>
+
+      <div className="panel full-panel">
+        <div className="panel-header">
+          <div>
+            <h2>Notices Served</h2>
+            <p>Counted on the day each notice went out</p>
+          </div>
+
+          <div className="segmented" role="group" aria-label="Chart grouping">
+            {BUCKETS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                className={`segment ${bucket === option.key ? "is-active" : ""}`}
+                aria-pressed={bucket === option.key}
+                onClick={() => setBucket(option.key)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="panel-chart">
+          <ChartShell
+            title={`Notices per ${bucketMeta.unit}`}
+            caption={`${seriesTotals.DEMAND} demand · ${seriesTotals.POSSESSION} possession · ${seriesTotals.TOTAL} in total across ${bucketMeta.window}`}
+            columns={[bucketMeta.label === "Monthly" ? "Month" : "Starting", "Demand", "Possession", "Total"]}
+            rows={noticeSeries.map((point) => [
+              point.label,
+              String(point.values.DEMAND),
+              String(point.values.POSSESSION),
+              String(point.values.TOTAL),
+            ])}
+          >
+            <LineChart points={noticeSeries} series={NOTICE_LINES} />
+          </ChartShell>
+        </div>
+      </div>
+
+      <LenderPanel
+        rows={lenderRows}
+        summary={lenderSummary}
+        filter={empanelment}
+        onFilter={setEmpanelment}
+      />
     </>
   );
 }

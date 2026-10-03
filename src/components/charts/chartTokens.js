@@ -63,6 +63,16 @@ export const NOTICE_COLORS = {
   POSSESSION: "#4a3aa7",
 };
 
+/* The insight lines: the two notice stages in their own colours plus the
+   total. Teal for the total because it has to stay apart from both the amber
+   and the indigo it is the sum of - it sits above them on every day, so a
+   near-miss on hue would read as a fourth stage rather than a running total. */
+export const NOTICE_SERIES_COLORS = {
+  DEMAND: NOTICE_COLORS.DEMAND,
+  POSSESSION: NOTICE_COLORS.POSSESSION,
+  TOTAL: "#0f766e",
+};
+
 export const DOCUMENT_COLORS = {
   DOCUMENTS_COMPLETE: "#2563eb",
   DOCUMENTS_PENDING: "#eda100",
@@ -95,10 +105,74 @@ export function barPath(x, y, width, height, radius = MARK.radius) {
   ].join("");
 }
 
-/** Smooth-ish polyline through points; plain segments keep values honest. */
+/** Straight segments through points; plain joins keep values honest. */
 export function linePath(points) {
   if (points.length === 0) return "";
   return points
     .map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`)
     .join("");
+}
+
+/**
+ * Curved line through points, monotone cubic (Fritsch-Carlson).
+ *
+ * The curve passes through every point and, unlike a plain cardinal spline,
+ * cannot overshoot between them: a run of 3, 0, 3 bows toward zero but never
+ * dips below it, so the chart can never draw a value the data does not have.
+ * That is the whole reason this interpolation and not a prettier one - a
+ * smoothed line that invents a trough reads as a quiet week that never
+ * happened.
+ */
+export function smoothPath(points) {
+  if (points.length === 0) return "";
+  if (points.length < 3) return linePath(points);
+
+  const n = points.length;
+
+  // Secant slope of each segment.
+  const slopes = [];
+  for (let i = 0; i < n - 1; i += 1) {
+    const dx = points[i + 1].x - points[i].x;
+    slopes.push(dx === 0 ? 0 : (points[i + 1].y - points[i].y) / dx);
+  }
+
+  // Tangents: the average of the neighbouring secants, ends kept flat-ish.
+  const tangents = [slopes[0]];
+  for (let i = 1; i < n - 1; i += 1) {
+    tangents.push(
+      slopes[i - 1] * slopes[i] <= 0 ? 0 : (slopes[i - 1] + slopes[i]) / 2
+    );
+  }
+  tangents.push(slopes[n - 2]);
+
+  // Clamp the tangents back into the monotone region; this is what rules out
+  // overshoot rather than merely making it unlikely.
+  for (let i = 0; i < n - 1; i += 1) {
+    if (slopes[i] === 0) {
+      tangents[i] = 0;
+      tangents[i + 1] = 0;
+      continue;
+    }
+
+    const alpha = tangents[i] / slopes[i];
+    const beta = tangents[i + 1] / slopes[i];
+    const magnitude = alpha * alpha + beta * beta;
+
+    if (magnitude > 9) {
+      const tau = 3 / Math.sqrt(magnitude);
+      tangents[i] = tau * alpha * slopes[i];
+      tangents[i + 1] = tau * beta * slopes[i];
+    }
+  }
+
+  let d = `M${points[0].x},${points[0].y}`;
+  for (let i = 0; i < n - 1; i += 1) {
+    const dx = (points[i + 1].x - points[i].x) / 3;
+    d +=
+      `C${points[i].x + dx},${points[i].y + tangents[i] * dx}` +
+      ` ${points[i + 1].x - dx},${points[i + 1].y - tangents[i + 1] * dx}` +
+      ` ${points[i + 1].x},${points[i + 1].y}`;
+  }
+
+  return d;
 }

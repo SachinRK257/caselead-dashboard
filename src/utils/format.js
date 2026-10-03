@@ -37,6 +37,16 @@ export function formatDate(value) {
   return DATE_FORMATTER.format(date);
 }
 
+/** "2026-09-04" -> "4 Sep". For axes, where the year is already established. */
+export function formatDayMonth(value) {
+  if (isEmptyValue(value)) return "-";
+
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return `${date.getDate()} ${date.toLocaleString("en-GB", { month: "short" })}`;
+}
+
 export function formatLongDate(date) {
   return LONG_DATE_FORMATTER.format(date);
 }
