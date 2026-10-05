@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
-import { ChevronDown, Menu, Search, X } from "lucide-react";
+import { Menu, Search, X } from "lucide-react";
 
-import { initialsOf } from "../utils/cases";
+import UserMenu from "./UserMenu";
 
 export default function Header({
   user,
+  users = [],
+  onSignIn,
   title = "Case Dashboard",
   subtitle = "",
   onOpenSidebar,
@@ -70,16 +72,7 @@ export default function Header({
           )}
         </div>
 
-        <div className="header-profile">
-          <div className="avatar" aria-hidden="true">
-            {initialsOf(user?.name)}
-          </div>
-          <div className="header-profile-text">
-            <strong>{user?.name ?? "Guest"}</strong>
-            <small>{user?.city ? `Salesperson · ${user.city}` : "Salesperson"}</small>
-          </div>
-          <ChevronDown size={16} aria-hidden="true" />
-        </div>
+        <UserMenu user={user} users={users} onSignIn={onSignIn} />
       </div>
     </header>
   );

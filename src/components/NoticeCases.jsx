@@ -1,37 +1,21 @@
-import { StatusCell } from "./caseCells";
+import { PossessionCell, StatusCell } from "./caseCells";
 import { formatDate, formatMoneyFull, formatMoneyShort } from "../utils/format";
 
 /**
- * How long is long enough to stand out. Past this the figure is marked, so the
- * eye lands on the cases that have been sitting rather than on the top row.
- */
-const STALE_DAYS = 180;
-
-/**
- * The oldest cases still waiting on someone.
+ * The cases behind a notice figure.
  *
- * This is the one place the dashboard names individual cases, and it earns it
- * by being a worklist rather than a listing: ten rows, every one of them a
- * case that has been open longest with nothing settled. The full book lives on
- * the Case Lead page.
- *
- * Columns run identity, place, state, then the two figures. The widths are
- * declared rather than left to the content, so one long lender name cannot
- * take a quarter of the row and squeeze the numbers it is competing with.
+ * Both notice dates are shown whichever card opened the list: a demand-stage
+ * case is defined by having no possession date, and seeing that column empty
+ * is what makes the grouping legible rather than something to take on trust.
  */
-export default function AgeingCases({ cases = [] }) {
+export default function NoticeCases({ cases = [] }) {
   if (cases.length === 0) {
-    return (
-      <p className="table-empty">
-        Nothing is waiting in these stages for the banks and cities picked
-        above.
-      </p>
-    );
+    return <p className="table-empty">No cases match this figure.</p>;
   }
 
   return (
     <div className="table-wrapper">
-      <table className="data-table ageing-table">
+      <table className="data-table notice-table">
         <colgroup>
           <col className="col-case" />
           <col className="col-borrower" />
@@ -39,7 +23,7 @@ export default function AgeingCases({ cases = [] }) {
           <col className="col-city" />
           <col className="col-status" />
           <col className="col-date" />
-          <col className="col-days" />
+          <col className="col-possession" />
           <col className="col-metric" />
         </colgroup>
 
@@ -51,9 +35,7 @@ export default function AgeingCases({ cases = [] }) {
             <th scope="col">City</th>
             <th scope="col">Status</th>
             <th scope="col">Demand notice</th>
-            {/* The two figures sit together at the right edge so their digits
-                share one rule to read down. */}
-            <th scope="col" className="is-num">Days open</th>
+            <th scope="col">Possession notice</th>
             <th scope="col" className="is-num">Liability</th>
           </tr>
         </thead>
@@ -74,15 +56,11 @@ export default function AgeingCases({ cases = [] }) {
               </td>
 
               <td>{formatDate(item.demandNoticeDate)}</td>
-
-              {/* The column the table is sorted by, so it carries the emphasis
-                  the sort implies. */}
-              <td
-                className={`days-open is-num ${
-                  item.daysOpen >= STALE_DAYS ? "is-stale" : ""
-                }`}
-              >
-                {item.daysOpen} days
+              <td>
+                <PossessionCell
+                  date={item.possessionNoticeDate}
+                  format={formatDate}
+                />
               </td>
 
               <td

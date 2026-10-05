@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { FileCheck2, FileClock, FileWarning, FileX2 } from "lucide-react";
+import { Eye, FileCheck2, FileClock, FileWarning, FileX2 } from "lucide-react";
 
+import DocViewer from "./sarfaesi/DocViewer";
 import { EMPANELMENT, EMPANELMENT_STATE } from "../utils/cases";
 import { formatDate } from "../utils/format";
 
@@ -12,6 +13,13 @@ import { formatDate } from "../utils/format";
  * the expiring and lapsed ones, which sort first and are the reason to look.
  */
 const ROWS = 12;
+
+/**
+ * The two states in which the empanelment is still in force. The letter can be
+ * opened whatever the state - it exists either way - but only these two mean
+ * it still covers the cases sitting at that lender.
+ */
+const LIVE = [EMPANELMENT_STATE.ACTIVE, EMPANELMENT_STATE.EXPIRING];
 
 /** Badge copy and styling per empanelment state. */
 const STATE_BADGE = {
@@ -30,6 +38,7 @@ const STATE_BADGE = {
  */
 export default function LenderPanel({ rows, summary, filter, onFilter }) {
   const [showAll, setShowAll] = useState(false);
+  const [letter, setLetter] = useState(null);
 
   const shown = showAll ? rows : rows.slice(0, ROWS);
 
@@ -82,6 +91,15 @@ export default function LenderPanel({ rows, summary, filter, onFilter }) {
 
       <div className="table-wrapper">
         <table className="data-table lender-table">
+          <colgroup>
+            <col className="col-lender" />
+            <col className="col-state" />
+            <col className="col-ref" />
+            <col className="col-term" />
+            <col className="col-end" />
+            <col className="col-live" />
+          </colgroup>
+
           <thead>
             <tr>
               <th scope="col">Lender</th>
@@ -104,14 +122,40 @@ export default function LenderPanel({ rows, summary, filter, onFilter }) {
                     {lender.name}
                   </th>
 
+                  {/* The state and the letter it rests on, together: the
+                      badge says whether the empanelment holds, and the button
+                      beside it opens the letter that says so. A lender with no
+                      letter has nothing to open and gets no button. */}
                   <td>
-                    <span className={`status-badge ${badge.className}`}>
-                      <Icon size={12} aria-hidden="true" />
-                      {badge.label}
+                    <span className="letter-cell">
+                      <span className={`status-badge ${badge.className}`}>
+                        <Icon size={12} aria-hidden="true" />
+                        {badge.label}
+                      </span>
+
+                      {lender.state !== EMPANELMENT_STATE.NONE && (
+                        <button
+                          type="button"
+                          className={`doc-view letter-view ${
+                            LIVE.includes(lender.state) ? "is-live" : ""
+                          }`}
+                          aria-label={`View the empanelment letter for ${lender.name}`}
+                          onClick={() => setLetter(lender)}
+                        >
+                          <Eye size={12} aria-hidden="true" />
+                          View
+                        </button>
+                      )}
                     </span>
                   </td>
 
-                  <td className="letter-ref">{lender.letterRef}</td>
+                  <td className="letter-ref">
+                    {lender.state === EMPANELMENT_STATE.NONE ? (
+                      <span className="cell-muted">Not on file</span>
+                    ) : (
+                      lender.letterRef
+                    )}
+                  </td>
 
                   <td>
                     {formatDate(lender.empStart)}
@@ -150,6 +194,20 @@ export default function LenderPanel({ rows, summary, filter, onFilter }) {
           </tbody>
         </table>
       </div>
+
+      {letter && (
+        <DocViewer
+          item={{ id: letter.letterRef, borrower: letter.name, bank: "" }}
+          doc={{ id: "empanelment-letter", label: "Empanelment Letter" }}
+          title="Empanelment Letter"
+          subtitle={`${letter.letterRef} · ${letter.name} · ${formatDate(
+            letter.empStart
+          )} to ${formatDate(letter.empEnd)}${
+            LIVE.includes(letter.state) ? " · in force" : " · lapsed"
+          }`}
+          onClose={() => setLetter(null)}
+        />
+      )}
 
       {rows.length > ROWS && (
         <button

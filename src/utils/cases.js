@@ -4,7 +4,7 @@ import {
   humanizeEnum,
   isEmptyValue,
 } from "./format";
-import { banks, salespeople } from "../data/mockData";
+import { banks, salespeople, users } from "../data/mockData";
 
 /** Liability at or above this is treated as a priority case. */
 export const HIGH_LIABILITY_THRESHOLD = 18000000;
@@ -122,6 +122,44 @@ export function parseAmount(value) {
 }
 
 /* ---------------------------------------------------------------- team --- */
+
+export const ROLE = {
+  ADMIN: "ADMIN",
+  SALESPERSON: "SALESPERSON",
+};
+
+const USERS_BY_ID = new Map(users.map((user) => [user.id, user]));
+
+/** Anyone who can sign in, admin included - unlike `getSalesperson`. */
+export function getUser(id) {
+  return id ? (USERS_BY_ID.get(id) ?? null) : null;
+}
+
+export function isAdmin(user) {
+  return user?.role === ROLE.ADMIN;
+}
+
+/**
+ * The cases a signed-in user is answerable for.
+ *
+ * An admin sees the whole book. A salesperson sees what is allocated to them
+ * plus whatever is still unallocated in their city - the app already treats
+ * that second group as theirs to pick up, which is why `describeAssignee`
+ * falls back to the city owner.
+ *
+ * Because every city has exactly one owner, the six salespeople's views
+ * partition the book: no case is invisible to everyone and none is counted
+ * twice.
+ */
+export function visibleCasesFor(cases, user) {
+  if (!user || isAdmin(user)) return cases;
+
+  return cases.filter(
+    (item) =>
+      item.assignedTo === user.id ||
+      (!item.assignedTo && item.city === user.city)
+  );
+}
 
 const BY_ID = new Map(salespeople.map((person) => [person.id, person]));
 const BY_CITY = new Map(salespeople.map((person) => [person.city, person]));

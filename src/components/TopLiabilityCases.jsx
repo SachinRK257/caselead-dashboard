@@ -24,16 +24,29 @@ export default function TopLiabilityCases({ cases = [] }) {
   return (
     <div className="table-wrapper">
       <table className="data-table liability-table">
+        <colgroup>
+          <col className="col-case" />
+          <col className="col-borrower" />
+          <col className="col-bank" />
+          <col className="col-city" />
+          <col className="col-status" />
+          <col className="col-date" />
+          <col className="col-possession" />
+          <col className="col-metric" />
+        </colgroup>
+
         <thead>
           <tr>
-            <th scope="col">Case</th>
+            <th scope="col">Case ID</th>
             <th scope="col">Borrower</th>
             <th scope="col">Bank</th>
             <th scope="col">City</th>
-            <th scope="col" className="is-num">Liability</th>
+            <th scope="col">Status</th>
             <th scope="col">Demand notice</th>
             <th scope="col">Possession notice</th>
-            <th scope="col">Status</th>
+            {/* The column the table is sorted by, last and right-aligned, the
+                same place Days open and Liability sit in the ageing list. */}
+            <th scope="col" className="is-num">Liability</th>
           </tr>
         </thead>
 
@@ -43,17 +56,12 @@ export default function TopLiabilityCases({ cases = [] }) {
               <th scope="row" className="case-id">
                 {item.id}
               </th>
-              <td>{item.borrower}</td>
-              <td>{item.bank}</td>
+              <td title={item.borrower}>{item.borrower}</td>
+              <td title={item.bank}>{item.bank}</td>
               <td>{item.city}</td>
 
-              {/* The column the table is sorted by, so it carries the emphasis
-                  the sort implies. */}
-              <td
-                className="liability-amount is-lead is-num"
-                title={formatMoneyFull(item.liability)}
-              >
-                {formatMoneyShort(item.liability)}
+              <td>
+                <StatusCell status={item.caseStatus} />
               </td>
 
               <td>{formatDate(item.demandNoticeDate)}</td>
@@ -64,8 +72,13 @@ export default function TopLiabilityCases({ cases = [] }) {
                 />
               </td>
 
-              <td>
-                <StatusCell status={item.caseStatus} />
+              {/* Carries the emphasis the sort implies, rather than sitting as
+                  one more number. */}
+              <td
+                className="liability-amount is-lead is-num"
+                title={formatMoneyFull(item.liability)}
+              >
+                {formatMoneyShort(item.liability)}
               </td>
             </tr>
           ))}

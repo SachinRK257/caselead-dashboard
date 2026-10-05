@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
-import { Building2, CircleDot, MapPin, X } from "lucide-react";
+import { Building2, MapPin, X } from "lucide-react";
 
 import AgeingCases from "../components/AgeingCases";
 import LenderPanel from "../components/LenderPanel";
+import NoticeCases from "../components/NoticeCases";
+import Pagination from "../components/Pagination";
 import TopLiabilityCases from "../components/TopLiabilityCases";
 import ScopeFilter from "../components/ScopeFilter";
 import StatCard from "../components/StatCard";
@@ -17,6 +19,8 @@ import {
   buildBankCounts,
   buildCityPanel,
   buildNoticeStage,
+  getNoticeStage,
+  NOTICE_STAGE,
   buildPanelCounts,
   buildPropertyMix,
   buildNoticeSeries,
@@ -61,6 +65,22 @@ const LIABILITY_ROWS = 10;
 // what a filter caught before deciding to open the rest.
 /* The five stages the dashboard reports. Every case carries exactly one, so
    these are counts of one population rather than overlapping tallies. */
+/* Ten rows a page, matching the capped tables above it. */
+const PER_PAGE = 10;
+
+/* What each notice card opens, read off the same helper that produced the
+   count - so the figure on the card and the rows under it cannot disagree. */
+const NOTICE_FOCUS = {
+  DEMAND: {
+    label: "Demand notice",
+    note: "served, still inside the 60-day window",
+  },
+  POSSESSION: {
+    label: "Possession notice",
+    note: "moved on to possession",
+  },
+};
+
 const STATUS_CARDS = [
   { key: "ALLOTTED", label: "Allocated" },
   { key: "CONTACTED", label: "Contacted" },
@@ -106,22 +126,21 @@ export default function Dashboard({ cases = [], today }) {
   // allocation and the city caseload count that same population.
   const [noticeBank, setNoticeBank] = useState(null);
   const [noticeCity, setNoticeCity] = useState(null);
-  const [noticeStatus, setNoticeStatus] = useState(null);
 
-  const hasFilters = Boolean(noticeBank || noticeCity || noticeStatus);
+  const hasFilters = Boolean(noticeBank || noticeCity);
 
   function clearFilters() {
     setNoticeBank(null);
     setNoticeCity(null);
-    setNoticeStatus(null);
   }
+  const [noticeFocus, setNoticeFocus] = useState(null);
+  const [noticePage, setNoticePage] = useState(1);
   const [empanelment, setEmpanelment] = useState(EMPANELMENT.ALL);
   const [bucket, setBucket] = useState(NOTICE_BUCKET.WEEK);
 
   const byBank = useMemo(() => buildBankCounts(cases), [cases]);
   const panel = useMemo(() => buildPanelCounts(cases), [cases]);
   const cityPanel = useMemo(() => buildCityPanel(cases), [cases]);
-  const statusPanel = useMemo(() => buildStatusPanel(cases), [cases]);
 
   const noticeSeries = useMemo(
     () => buildNoticeSeries(cases, bucket),
@@ -185,15 +204,38 @@ export default function Dashboard({ cases = [], today }) {
     [cases, noticeBank, noticeCity]
   );
 
-  const noticeScope = useMemo(
-    () =>
-      noticeStatus
-        ? placeScope.filter((c) => c.caseStatus === noticeStatus)
-        : placeScope,
-    [placeScope, noticeStatus]
-  );
+  // Nothing narrows the strip beyond the place filters any more, so the two
+  // scopes are the same list - kept named apart because the cards and the
+  // status counts are still two different readings of it.
+  const noticeScope = placeScope;
 
   const notices = useMemo(() => buildNoticeStage(noticeScope), [noticeScope]);
+
+  // Same scope the cards count, so the filters above govern the list too.
+  const noticeRows = useMemo(
+    () =>
+      noticeFocus
+        ? noticeScope.filter(
+            (item) => getNoticeStage(item) === NOTICE_STAGE[noticeFocus]
+          )
+        : [],
+    [noticeScope, noticeFocus]
+  );
+
+  const noticePages = Math.max(1, Math.ceil(noticeRows.length / PER_PAGE));
+
+  // Clamped rather than reset: narrowing a filter can shorten the list under
+  // the reader, and page 7 of 3 would otherwise show an empty table.
+  const safePage = Math.min(noticePage, noticePages);
+  const pagedNotices = noticeRows.slice(
+    (safePage - 1) * PER_PAGE,
+    safePage * PER_PAGE
+  );
+
+  function pickNotice(key) {
+    setNoticeFocus((current) => (current === key ? null : key));
+    setNoticePage(1);
+  }
 
   const ageing = useMemo(
     () => buildAgeingCases(placeScope, today, AGEING_ROWS),
@@ -233,9 +275,6 @@ export default function Dashboard({ cases = [], today }) {
   // and that is the more useful thing to print beside the count.
   const cityOwner = getOwnerForCity(noticeCity);
 
-  const statusLabel =
-    statusPanel.find((option) => option.key === noticeStatus)?.label ?? null;
-
   // "not contacted, contacted or following up", built from the same list the
   // query uses so the heading cannot drift from what is actually shown.
   const activeStageLabel = ACTIVE_CASE_STATUSES.map((key) =>
@@ -245,10 +284,10 @@ export default function Dashboard({ cases = [], today }) {
     .replace(/, ([^,]*)$/, " or $1");
 
   const placeLabel =
-    [noticeBank, noticeCity].filter(Boolean).join(" in ") ||
+    [noticeBank, noticeCity].filter(Boolean).join(" · ") ||
     "all banks and cities";
 
-  const noticeLabel = [placeLabel, statusLabel].filter(Boolean).join(" · ");
+  const noticeLabel = placeLabel;
 
   return (
     <>
@@ -314,16 +353,6 @@ export default function Dashboard({ cases = [], today }) {
               icon={MapPin}
             />
 
-            <ScopeFilter
-              options={statusPanel}
-              value={noticeStatus}
-              onChange={setNoticeStatus}
-              total={cases.length}
-              noun="Status"
-              allLabel="All"
-              icon={CircleDot}
-            />
-
             {hasFilters && (
               <button
                 type="button"
@@ -356,6 +385,8 @@ export default function Dashboard({ cases = [], today }) {
               noticeScope.length
             } cases · still inside the 60-day window`}
             className="notice-card notice-demand"
+            active={noticeFocus === "DEMAND"}
+            onClick={() => pickNotice("DEMAND")}
           />
 
           <StatCard
@@ -366,9 +397,44 @@ export default function Dashboard({ cases = [], today }) {
               noticeScope.length
             )}% of ${noticeScope.length} cases · moved on to possession`}
             className="notice-card notice-possession"
+            active={noticeFocus === "POSSESSION"}
+            onClick={() => pickNotice("POSSESSION")}
           />
         </div>
       </section>
+
+      {noticeFocus && (
+        <div className="panel full-panel">
+          <div className="panel-header">
+            <div>
+              <h2>{NOTICE_FOCUS[noticeFocus].label} cases</h2>
+              <p>
+                {noticeRows.length} {NOTICE_FOCUS[noticeFocus].note}, for{" "}
+                {placeLabel}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="scope-clear"
+              onClick={() => pickNotice(noticeFocus)}
+            >
+              <X size={13} aria-hidden="true" />
+              Close
+            </button>
+          </div>
+
+          <NoticeCases cases={pagedNotices} />
+
+          <Pagination
+            page={safePage}
+            pageCount={noticePages}
+            total={noticeRows.length}
+            perPage={PER_PAGE}
+            onPage={setNoticePage}
+          />
+        </div>
+      )}
 
       {/* Counts, not cases: the case list itself lives on the Case Lead page,
           and this is the dashboard's summary of it. */}
@@ -392,9 +458,7 @@ export default function Dashboard({ cases = [], today }) {
                 statusCounts[card.key] ?? 0,
                 placeScope.length
               )}% of ${placeScope.length} cases`}
-              className={`notice-card ${
-                noticeStatus === card.key ? "is-picked" : ""
-              }`}
+              className="notice-card"
             />
           ))}
         </div>
@@ -403,35 +467,40 @@ export default function Dashboard({ cases = [], today }) {
       <div className="panel full-panel">
         <div className="panel-header">
           <div>
-            <h2>Longest Open Cases</h2>
-            <p>
-              Still {activeStageLabel} — oldest first, counted from the demand
-              notice, for {placeLabel}
-            </p>
+            <h2>Notices Served</h2>
+            <p>Counted on the day each notice went out</p>
           </div>
-          <span className="count-chip">top {AGEING_ROWS}</span>
+
+          <div className="segmented" role="group" aria-label="Chart grouping">
+            {BUCKETS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                className={`segment ${bucket === option.key ? "is-active" : ""}`}
+                aria-pressed={bucket === option.key}
+                onClick={() => setBucket(option.key)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <AgeingCases cases={ageing} />
-      </div>
-
-      <div className="panel full-panel">
-        <div className="panel-header">
-          <div>
-            <h2>Highest Liability Cases</h2>
-            <p>
-              Largest amounts outstanding and how far each has been taken, for{" "}
-              {placeLabel}
-              {tiedBelowCut > 0 &&
-                ` — ${tiedBelowCut} more case${
-                  tiedBelowCut === 1 ? "" : "s"
-                } at the same amount not shown`}
-            </p>
-          </div>
-          <span className="count-chip">top {LIABILITY_ROWS}</span>
+        <div className="panel-chart">
+          <ChartShell
+            title={`Notices per ${bucketMeta.unit}`}
+            caption={`${seriesTotals.DEMAND} demand · ${seriesTotals.POSSESSION} possession · ${seriesTotals.TOTAL} in total across ${bucketMeta.window}`}
+            columns={[bucketMeta.label === "Monthly" ? "Month" : "Starting", "Demand", "Possession", "Total"]}
+            rows={noticeSeries.map((point) => [
+              point.label,
+              String(point.values.DEMAND),
+              String(point.values.POSSESSION),
+              String(point.values.TOTAL),
+            ])}
+          >
+            <LineChart points={noticeSeries} series={NOTICE_LINES} />
+          </ChartShell>
         </div>
-
-        <TopLiabilityCases cases={topLiability} />
       </div>
 
       <section className="dashboard-charts">
@@ -498,40 +567,35 @@ export default function Dashboard({ cases = [], today }) {
       <div className="panel full-panel">
         <div className="panel-header">
           <div>
-            <h2>Notices Served</h2>
-            <p>Counted on the day each notice went out</p>
+            <h2>Longest Open Cases</h2>
+            <p>
+              Still {activeStageLabel} — oldest first, counted from the demand
+              notice, for {placeLabel}
+            </p>
           </div>
-
-          <div className="segmented" role="group" aria-label="Chart grouping">
-            {BUCKETS.map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                className={`segment ${bucket === option.key ? "is-active" : ""}`}
-                aria-pressed={bucket === option.key}
-                onClick={() => setBucket(option.key)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          <span className="count-chip">top {AGEING_ROWS}</span>
         </div>
 
-        <div className="panel-chart">
-          <ChartShell
-            title={`Notices per ${bucketMeta.unit}`}
-            caption={`${seriesTotals.DEMAND} demand · ${seriesTotals.POSSESSION} possession · ${seriesTotals.TOTAL} in total across ${bucketMeta.window}`}
-            columns={[bucketMeta.label === "Monthly" ? "Month" : "Starting", "Demand", "Possession", "Total"]}
-            rows={noticeSeries.map((point) => [
-              point.label,
-              String(point.values.DEMAND),
-              String(point.values.POSSESSION),
-              String(point.values.TOTAL),
-            ])}
-          >
-            <LineChart points={noticeSeries} series={NOTICE_LINES} />
-          </ChartShell>
+        <AgeingCases cases={ageing} />
+      </div>
+
+      <div className="panel full-panel">
+        <div className="panel-header">
+          <div>
+            <h2>Highest Liability Cases</h2>
+            <p>
+              Largest amounts outstanding and how far each has been taken, for{" "}
+              {placeLabel}
+              {tiedBelowCut > 0 &&
+                ` — ${tiedBelowCut} more case${
+                  tiedBelowCut === 1 ? "" : "s"
+                } at the same amount not shown`}
+            </p>
+          </div>
+          <span className="count-chip">top {LIABILITY_ROWS}</span>
         </div>
+
+        <TopLiabilityCases cases={topLiability} />
       </div>
 
       <LenderPanel
