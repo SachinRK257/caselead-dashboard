@@ -57,6 +57,10 @@
   /* Elevation: soft and layered rather than one hard drop */
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.05);
+  /* What a card lifts to under the pointer. --shadow is a resting state and
+     reads as barely a change at 5% - this is the one that registers. */
+  --shadow-hover: 0 1px 2px rgba(15, 23, 42, 0.05),
+    0 10px 24px rgba(15, 23, 42, 0.1);
   --shadow-lg: 0 10px 30px rgba(15, 23, 42, 0.1);
 
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
@@ -162,17 +166,8 @@ button {
   font-size: 11px;
 }
 
-.sidebar-label {
-  margin: 0;
-  padding: 22px 20px 8px;
-  color: #64748b;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-}
-
 .sidebar-nav {
-  padding: 0 12px;
+  padding: 18px 12px 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -605,11 +600,25 @@ button {
   border-radius: var(--r-lg);
   padding: 20px 22px;
   box-shadow: var(--shadow-sm);
-  transition: box-shadow var(--t-hover) var(--ease);
+  transition: box-shadow var(--t-hover) var(--ease),
+    border-color var(--t-hover) var(--ease);
 }
 
+/* Every card lifts under the pointer, whether or not it opens anything. */
 .stat-card:hover {
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-hover);
+}
+
+/* A card that opens its cases also takes the brand edge, so the shadow alone
+   is never the thing you have to read to tell what is clickable. */
+button.stat-card:hover {
+  border-color: var(--brand-line);
+}
+
+/* The picked card keeps its marker and still answers the pointer; without
+   this it is the one card on the page that goes dead under the cursor. */
+.stat-card.is-picked:hover {
+  box-shadow: var(--shadow-hover), inset 3px 0 0 var(--brand);
 }
 
 button.stat-card {
@@ -699,7 +708,12 @@ button.stat-card:focus-visible {
 }
 
 .stage-step:hover {
-  box-shadow: var(--shadow);
+  border-color: var(--brand-line);
+  box-shadow: var(--shadow-hover);
+}
+
+.stage-step.is-picked:hover {
+  box-shadow: var(--shadow-hover), inset 3px 0 0 var(--brand);
 }
 
 .stage-step.is-picked {
@@ -3294,9 +3308,73 @@ button.stat-card:focus-visible {
 .chart-legend li {
   display: flex;
   align-items: center;
-  gap: 6px;
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* The key is the control that picks its line out of the pile, so it behaves
+   like one - a target you can hover, tab to and click to pin. */
+.chart-legend-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: opacity var(--t-hover) var(--ease),
+    background var(--t-hover) var(--ease), color var(--t-hover) var(--ease);
+}
+
+.chart-legend-key:hover,
+.chart-legend-key[aria-pressed="true"] {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.chart-legend-key:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+/* Faded rather than hidden: the keys must stay in place and stay readable, or
+   the row reflows under the pointer and you lose the one you were aiming at. */
+.chart-legend-key.is-dimmed {
+  opacity: 0.4;
+}
+
+/* The lines themselves drop much further back - at this opacity they read as
+   the chart's own background and the picked line has the plot to itself. */
+.chart-line {
+  transition: opacity var(--t-hover) var(--ease);
+}
+
+/* Curves are rendered for accuracy of shape rather than for crisp pixels: the
+   default snaps a stroke to the pixel grid, which is what puts the faint
+   stair-steps along a shallow slope. */
+.chart-line path {
+  shape-rendering: geometricPrecision;
+}
+
+.chart-line.is-dimmed,
+.chart-marker.is-dimmed {
+  opacity: 0.12;
+}
+
+.chart-marker {
+  transition: opacity var(--t-hover) var(--ease);
+}
+
+.chart-tooltip-row {
+  transition: opacity var(--t-hover) var(--ease);
+}
+
+.chart-tooltip-row.is-dimmed {
+  opacity: 0.35;
 }
 
 .chart-legend strong {

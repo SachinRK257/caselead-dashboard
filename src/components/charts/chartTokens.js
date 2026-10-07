@@ -71,6 +71,12 @@ export const NOTICE_SERIES_COLORS = {
   DEMAND: NOTICE_COLORS.DEMAND,
   POSSESSION: NOTICE_COLORS.POSSESSION,
   TOTAL: "#0f766e",
+  /* Rose for verified, picked by measurement rather than by meaning: it sits
+     in the one wide gap left between the amber, the violet and the teal. The
+     green this started as was only 35 deltaE from the teal total beside it,
+     where every other pair on this chart clears 82; rose clears 75 against all
+     three and holds 6.3:1 on the white plot ground. */
+  VERIFIED: "#be123c",
 };
 
 export const DOCUMENT_COLORS = {

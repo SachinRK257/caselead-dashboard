@@ -103,15 +103,20 @@ const BUCKETS = [
   },
 ];
 
-/* Total last, so it draws over the two it is made of rather than under them
-   - it is the sum, so it sits highest on every point and would otherwise be
-   the line hidden by its own parts. */
+/* Total last, so it draws over the three below it rather than under them - it
+   is the sum of the first two and sits highest on every point, and Verified is
+   a subset of Demand, so either would otherwise be hidden by the line above. */
 const NOTICE_LINES = [
   { key: "DEMAND", label: "Demand notice", color: NOTICE_SERIES_COLORS.DEMAND },
   {
     key: "POSSESSION",
     label: "Possession notice",
     color: NOTICE_SERIES_COLORS.POSSESSION,
+  },
+  {
+    key: "VERIFIED",
+    label: "Verified",
+    color: NOTICE_SERIES_COLORS.VERIFIED,
   },
   { key: "TOTAL", label: "Total notices", color: NOTICE_SERIES_COLORS.TOTAL },
 ];
@@ -490,15 +495,26 @@ export default function Dashboard({ cases = [], today }) {
           <ChartShell
             title={`Notices per ${bucketMeta.unit}`}
             caption={`${seriesTotals.DEMAND} demand · ${seriesTotals.POSSESSION} possession · ${seriesTotals.TOTAL} in total across ${bucketMeta.window}`}
-            columns={[bucketMeta.label === "Monthly" ? "Month" : "Starting", "Demand", "Possession", "Total"]}
+            columns={[
+              bucketMeta.label === "Monthly" ? "Month" : "Starting",
+              "Demand",
+              "Possession",
+              "Verified",
+              "Total",
+            ]}
             rows={noticeSeries.map((point) => [
               point.label,
               String(point.values.DEMAND),
               String(point.values.POSSESSION),
+              String(point.values.VERIFIED),
               String(point.values.TOTAL),
             ])}
           >
-            <LineChart points={noticeSeries} series={NOTICE_LINES} />
+            <LineChart
+              points={noticeSeries}
+              series={NOTICE_LINES}
+              markers={bucket === NOTICE_BUCKET.DAY}
+            />
           </ChartShell>
         </div>
       </div>

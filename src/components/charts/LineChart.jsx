@@ -80,10 +80,29 @@ function labelIndices(count, step) {
  * When the buckets outgrow the panel the plot scrolls sideways and can be
  * dragged, but the y axis is a separate layer that stays put: a chart you can
  * pan is no use if the scale slides off with it.
+ *
+ * Pointing at a key in the legend brings that line forward and fades the rest.
+ * With four series over one axis they sit on top of each other wherever two
+ * counts agree - and they agree often - so being able to pick one out is the
+ * difference between reading the chart and guessing at it.
+ *
+ * Every series is drawn as a curve. The interpolation is monotone cubic, so it
+ * provably cannot overshoot: it never bulges above the highest point or below
+ * the lowest one it joins, which is what makes a curve safe over counts.
+ *
+ * `markers` puts a dot on each reading. It is for the daily view, where the
+ * counts are small whole numbers - the curve between them is a join, not data,
+ * and the dots are what say where the real readings sit.
  */
-export default function LineChart({ points = [], series = [] }) {
+export default function LineChart({ points = [], series = [], markers = false }) {
   const [scrollRef, viewport] = useWidth();
   const [active, setActive] = useState(null);
+
+  // Two of them, because leaving a key has to let go of the hover without
+  // letting go of a pick: clicking a key keeps that line out on its own while
+  // the pointer goes to the plot, which is the whole reason to pin one.
+  const [hovered, setHovered] = useState(null);
+  const [pinned, setPinned] = useState(null);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [dragging, setDragging] = useState(false);
 
@@ -173,6 +192,16 @@ export default function LineChart({ points = [], series = [] }) {
   const xLabels = labelIndices(points.length, step);
   const scrollable = contentW > viewport + 1;
 
+  const focus = hovered ?? pinned;
+  const dimmed = (key) => focus !== null && focus !== key;
+
+  // The picked line is drawn last so it sits over the ones it was hidden under
+  // - fading the others is not enough when they are stacked exactly on it.
+  const drawOrder =
+    focus === null
+      ? series
+      : [...series.filter((s) => s.key !== focus), ...series.filter((s) => s.key === focus)];
+
   // Where the crosshair sits once the plot has been panned. Off the left or
   // right edge means the tooltip would point at nothing, so it is dropped.
   const tipX = active === null ? 0 : AXIS_W + xAt(active) - scrollLeft;
@@ -181,15 +210,26 @@ export default function LineChart({ points = [], series = [] }) {
 
   return (
     <div className="line-chart">
-      <ul className="chart-legend">
+      <ul className={`chart-legend ${focus ? "is-picking" : ""}`}>
         {series.map((s) => (
           <li key={s.key}>
-            <span
-              className="chart-key chart-key-dot"
-              style={{ background: s.color }}
-              aria-hidden="true"
-            />
-            {s.label}
+            <button
+              type="button"
+              className={`chart-legend-key ${dimmed(s.key) ? "is-dimmed" : ""}`}
+              aria-pressed={pinned === s.key}
+              onPointerEnter={() => setHovered(s.key)}
+              onPointerLeave={() => setHovered(null)}
+              onFocus={() => setHovered(s.key)}
+              onBlur={() => setHovered(null)}
+              onClick={() => setPinned((now) => (now === s.key ? null : s.key))}
+            >
+              <span
+                className="chart-key chart-key-dot"
+                style={{ background: s.color }}
+                aria-hidden="true"
+              />
+              {s.label}
+            </button>
           </li>
         ))}
 
@@ -254,22 +294,44 @@ export default function LineChart({ points = [], series = [] }) {
               ))}
 
 
-              {series.map((s) => (
-                <path
-                  key={s.key}
-                  d={smoothPath(
-                    points.map((p, i) => ({
-                      x: xAt(i),
-                      y: yAt(p.values[s.key] ?? 0),
-                    }))
-                  )}
-                  fill="none"
-                  stroke={s.color}
-                  strokeWidth={MARK.lineWidth}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                />
-              ))}
+              {drawOrder.map((s) => {
+                const seat = points.map((p, i) => ({
+                  x: xAt(i),
+                  y: yAt(p.values[s.key] ?? 0),
+                }));
+
+                return (
+                  <g
+                    key={s.key}
+                    className={`chart-line ${dimmed(s.key) ? "is-dimmed" : ""}`}
+                  >
+                    <path
+                      d={smoothPath(seat)}
+                      fill="none"
+                      stroke={s.color}
+                      strokeWidth={
+                        focus === s.key ? MARK.lineWidth + 1 : MARK.lineWidth
+                      }
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                    />
+
+                    {/* Where the readings are sparse whole numbers, each one is
+                        marked, so the curve is read as the join between them
+                        rather than as a value of its own. */}
+                    {markers &&
+                      seat.map((pt, i) => (
+                        <circle
+                          key={points[i].key}
+                          cx={pt.x}
+                          cy={pt.y}
+                          r={focus === s.key ? 3 : 2.5}
+                          fill={s.color}
+                        />
+                      ))}
+                  </g>
+                );
+              })}
 
               {active !== null && (
                 <g
@@ -288,7 +350,9 @@ export default function LineChart({ points = [], series = [] }) {
                   {series.map((s) => (
                     <g
                       key={`dot-${s.key}`}
-                      className="chart-marker"
+                      className={`chart-marker ${
+                        dimmed(s.key) ? "is-dimmed" : ""
+                      }`}
                       style={{
                         transform: `translateY(${yAt(
                           points[active].values[s.key] ?? 0
@@ -339,7 +403,12 @@ export default function LineChart({ points = [], series = [] }) {
             </strong>
 
             {series.map((s) => (
-              <div key={s.key} className="chart-tooltip-row">
+              <div
+                key={s.key}
+                className={`chart-tooltip-row ${
+                  dimmed(s.key) ? "is-dimmed" : ""
+                }`}
+              >
                 <span className="chart-key" style={{ background: s.color }} />
                 <strong>{points[active].values[s.key] ?? 0}</strong>
                 <span>{s.label}</span>

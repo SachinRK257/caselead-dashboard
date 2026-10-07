@@ -572,6 +572,7 @@ function isoDay(date) {
 function countByDay(cases) {
   const demand = new Map();
   const possession = new Map();
+  const verified = new Map();
 
   const add = (map, value) => {
     if (isEmptyValue(value)) return;
@@ -581,9 +582,16 @@ function countByDay(cases) {
   for (const item of cases) {
     add(demand, item.demandNoticeDate);
     add(possession, item.possessionNoticeDate);
+
+    // "Verified" is not a field in the data. The nearest real signal is a
+    // complete supporting file, so that is what this counts, dated to the
+    // notice it backs - the only date the record actually carries.
+    if (item.documents === DOCUMENT_STATUS.DOCUMENTS_COMPLETE) {
+      add(verified, item.demandNoticeDate);
+    }
   }
 
-  return { demand, possession };
+  return { demand, possession, verified };
 }
 
 /**
@@ -604,13 +612,14 @@ export function buildNoticeSeries(
   bucket = NOTICE_BUCKET.WEEK,
   today = new Date()
 ) {
-  const { demand, possession } = countByDay(cases);
+  const { demand, possession, verified } = countByDay(cases);
   if (demand.size === 0 && possession.size === 0) return [];
 
   const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const at = (key) => ({
     DEMAND: demand.get(key) ?? 0,
     POSSESSION: possession.get(key) ?? 0,
+    VERIFIED: verified.get(key) ?? 0,
   });
   const point = (key, label, values) => ({
     key,
@@ -634,12 +643,13 @@ export function buildNoticeSeries(
     const points = [];
     for (let w = 11; w >= 0; w -= 1) {
       const first = new Date(end.getTime() - (w * 7 + 6) * DAY_MS);
-      const values = { DEMAND: 0, POSSESSION: 0 };
+      const values = { DEMAND: 0, POSSESSION: 0, VERIFIED: 0 };
 
       for (let d = 0; d < 7; d += 1) {
         const day = at(isoDay(new Date(first.getTime() + d * DAY_MS)));
         values.DEMAND += day.DEMAND;
         values.POSSESSION += day.POSSESSION;
+        values.VERIFIED += day.VERIFIED;
       }
 
       points.push(
@@ -668,13 +678,16 @@ export function buildNoticeSeries(
     const year = cursor.getFullYear();
     const month = cursor.getMonth();
     const prefix = `${year}-${String(month + 1).padStart(2, "0")}`;
-    const values = { DEMAND: 0, POSSESSION: 0 };
+    const values = { DEMAND: 0, POSSESSION: 0, VERIFIED: 0 };
 
     for (const [key, count] of demand) {
       if (key.startsWith(prefix)) values.DEMAND += count;
     }
     for (const [key, count] of possession) {
       if (key.startsWith(prefix)) values.POSSESSION += count;
+    }
+    for (const [key, count] of verified) {
+      if (key.startsWith(prefix)) values.VERIFIED += count;
     }
 
     points.push(

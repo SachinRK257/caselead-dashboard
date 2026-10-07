@@ -3,17 +3,11 @@ import { Gauge, LayoutDashboard, X } from "lucide-react";
 
 import { initialsOf } from "../utils/cases";
 
-/* Grouped rather than one flat list: the SARFAESI pages are three views of
-   one run, and a heading says so without a word of explanation. */
-const NAV_GROUPS = [
-  {
-    label: "CASE LEAD",
-    items: [{ id: "case-lead", label: "Dashboard", icon: LayoutDashboard }],
-  },
-  {
-    label: "SARFAESI",
-    items: [{ id: "sarfaesi", label: "Dashboard", icon: Gauge }],
-  },
+/* One flat list: at two destinations a heading over each costs more room than
+   it explains, and the names carry themselves. */
+const NAV_ITEMS = [
+  { id: "case-lead", label: "Dashboard", icon: LayoutDashboard },
+  { id: "sarfaesi", label: "Report", icon: Gauge },
 ];
 
 export default function Sidebar({
@@ -97,12 +91,7 @@ export default function Sidebar({
           </button>
         </div>
 
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label}>
-            <p className="sidebar-label">{group.label}</p>
-            <nav className="sidebar-nav">{group.items.map(renderNavItem)}</nav>
-          </div>
-        ))}
+        <nav className="sidebar-nav">{NAV_ITEMS.map(renderNavItem)}</nav>
 
         <div className="sidebar-bottom">
           <div className="profile-card">

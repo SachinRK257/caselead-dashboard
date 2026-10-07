@@ -68,7 +68,7 @@ export default function App() {
           user={currentUser}
           users={users}
           onSignIn={setUserId}
-          title={onSarfaesi ? "SARFAESI" : "Case Lead Dashboard"}
+          title={onSarfaesi ? "SARFAESI Report" : "Case Lead Dashboard"}
           subtitle={
             onSarfaesi
               ? "Symbolic, Section 14 and Physical — allotted cases only"
